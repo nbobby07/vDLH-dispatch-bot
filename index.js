@@ -649,7 +649,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
             // Header Text
             ctx.fillStyle = '#ffffff';
             ctx.font = 'bold 30px sans-serif';
-            ctx.fillText('VIRTUAL ROBLOX AIRLINES', 60, 80);
+            ctx.fillText('BRITISH AIRWAYS', 60, 80);
 
             // Subtitle
             ctx.fillStyle = '#075AAA';
