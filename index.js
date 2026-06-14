@@ -453,6 +453,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
             }
 
             flightLogCooldowns.set(userId, Date.now());
+            setTimeout(() => flightLogCooldowns.delete(userId), COOLDOWN_AMOUNT);
             
             const pilotUser = interaction.options.getUser('discord');
             const callsign = interaction.options.getString('callsign');
@@ -466,8 +467,17 @@ client.on(Events.InteractionCreate, async (interaction) => {
             let aiReasoning = "AI verification failed or was not completely confident.";
             
             try {
-                // Fetch the image from Discord
-                const imageResp = await fetch(proof.url);
+                // Fetch the image from Discord with timeout
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout
+                
+                let imageResp;
+                try {
+                    imageResp = await fetch(proof.url, { signal: controller.signal });
+                } finally {
+                    clearTimeout(timeoutId);
+                }
+                
                 const arrayBuffer = await imageResp.arrayBuffer();
                 const buffer = Buffer.from(arrayBuffer);
 
@@ -793,6 +803,11 @@ client.on(Events.InteractionCreate, async (interaction) => {
             await interaction.deferReply();
             const targetUser = interaction.options.getUser('user');
             const count = interaction.options.getInteger('count');
+            
+            if (count < 0) {
+                const embed = new EmbedBuilder().setColor("#FF0000").setDescription("Flight count cannot be negative.");
+                return interaction.editReply({ embeds: [embed] });
+            }
             
             await db.setFlightCount(targetUser.id, count);
             const embed = new EmbedBuilder().setColor("#00FF00").setDescription(`Successfully set <@${targetUser.id}>'s flight count to **${count}**.`);
