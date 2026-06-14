@@ -4,7 +4,7 @@ const db = require('./db');
 const config = require('./config');
 const { GoogleGenAI } = require('@google/genai');
 const fs = require('fs');
-const cron = require('node-cron');
+
 
 const flightLogCooldowns = new Map();
 const ai = new GoogleGenAI({
