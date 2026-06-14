@@ -1,5 +1,6 @@
 require('dotenv').config();
-const { Client, GatewayIntentBits, Partials, Events, StringSelectMenuBuilder, StringSelectMenuOptionBuilder, ActionRowBuilder, REST, Routes, ButtonBuilder, ButtonStyle, EmbedBuilder } = require('discord.js');
+const { Client, GatewayIntentBits, Partials, Events, StringSelectMenuBuilder, StringSelectMenuOptionBuilder, ActionRowBuilder, REST, Routes, ButtonBuilder, ButtonStyle, EmbedBuilder, AttachmentBuilder } = require('discord.js');
+const { createCanvas, loadImage, GlobalFonts } = require('@napi-rs/canvas');
 const db = require('./db');
 const config = require('./config');
 const { GoogleGenAI } = require('@google/genai');
@@ -612,17 +613,83 @@ client.on(Events.InteractionCreate, async (interaction) => {
                 }
             }
             
-            const embed = new EmbedBuilder()
-                .setTitle(`Pilot Profile: ${targetUser.username}`)
-                .addFields([
-                    { name: 'Total Flights', value: userRecord.flightCount.toString(), inline: true },
-                    { name: 'Current Rank', value: currentRank, inline: true },
-                    { name: 'Unlocked Planes', value: userRecord.unlockedPlanes.length > 0 ? userRecord.unlockedPlanes.join(', ') : 'None', inline: false }
-                ])
-                .setThumbnail(targetUser.displayAvatarURL())
-                .setColor("#075AAA");
+            await interaction.deferReply();
             
-            await interaction.reply({ embeds: [embed] });
+            const canvas = createCanvas(800, 400);
+            const ctx = canvas.getContext('2d');
+
+            // Draw Background (Airline blue gradient)
+            const gradient = ctx.createLinearGradient(0, 0, 800, 400);
+            gradient.addColorStop(0, '#075AAA');
+            gradient.addColorStop(1, '#032B4C');
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Draw card base (white rounded rect with shadow)
+            ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+            ctx.shadowBlur = 15;
+            ctx.shadowOffsetX = 5;
+            ctx.shadowOffsetY = 5;
+            ctx.fillStyle = '#f0f4f8';
+            ctx.beginPath();
+            ctx.roundRect(40, 40, 720, 320, 15);
+            ctx.fill();
+            ctx.shadowColor = 'transparent'; // Reset shadow
+
+            // Draw header bar
+            ctx.fillStyle = '#075AAA';
+            ctx.beginPath();
+            ctx.roundRect(40, 40, 720, 60, [15, 15, 0, 0]);
+            ctx.fill();
+
+            // Header Text
+            ctx.fillStyle = '#ffffff';
+            ctx.font = 'bold 30px sans-serif';
+            ctx.fillText('VIRTUAL ROBLOX AIRLINES', 60, 80);
+
+            // Subtitle
+            ctx.fillStyle = '#075AAA';
+            ctx.font = 'bold 24px sans-serif';
+            ctx.fillText('AIRLINE TRANSPORT PILOT CERTIFICATE', 60, 140);
+
+            // Fields
+            ctx.fillStyle = '#555555';
+            ctx.font = 'bold 16px sans-serif';
+            ctx.fillText('NAME', 60, 180);
+            ctx.fillText('RATINGS (RANK)', 60, 240);
+            ctx.fillText('LOGGED FLIGHTS', 60, 300);
+
+            ctx.fillStyle = '#000000';
+            ctx.font = '24px sans-serif';
+            ctx.fillText(targetUser.username.toUpperCase(), 60, 205);
+            ctx.fillText(currentRank.toUpperCase(), 60, 265);
+            ctx.fillText(userRecord.flightCount.toString(), 60, 325);
+
+            // Profile Picture
+            const avatarUrl = targetUser.displayAvatarURL({ extension: 'png', size: 256 });
+            try {
+                const avatar = await loadImage(avatarUrl);
+                ctx.save();
+                ctx.beginPath();
+                ctx.arc(630, 210, 80, 0, Math.PI * 2, true);
+                ctx.closePath();
+                ctx.clip();
+                ctx.drawImage(avatar, 550, 130, 160, 160);
+                ctx.restore();
+                
+                // Draw border around avatar
+                ctx.strokeStyle = '#075AAA';
+                ctx.lineWidth = 4;
+                ctx.beginPath();
+                ctx.arc(630, 210, 80, 0, Math.PI * 2, true);
+                ctx.stroke();
+            } catch (err) {
+                console.error("Failed to load avatar:", err);
+            }
+
+            const attachment = new AttachmentBuilder(await canvas.encode('png'), { name: 'profile-license.png' });
+            
+            await interaction.editReply({ files: [attachment] });
         } else if (interaction.commandName === 'set-flights') {
             if (!interaction.member.permissions.has('Administrator')) {
                 const embed = new EmbedBuilder().setColor("#FF0000").setDescription("You do not have permission to use this command.");
