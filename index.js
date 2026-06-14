@@ -654,12 +654,13 @@ client.on(Events.InteractionCreate, async (interaction) => {
             const pageData = await getRosterPage(0);
             await interaction.reply(pageData);
         } else if (interaction.commandName === 'profile') {
+            await interaction.deferReply();
             const targetUser = interaction.options.getUser('user') || interaction.user;
             const userRecord = await db.getUser(targetUser.id);
             
             if (!userRecord) {
                 const embed = new EmbedBuilder().setColor("#FF0000").setDescription(`<@${targetUser.id}> hasn't logged any flights yet.`);
-                return interaction.reply({ embeds: [embed], ephemeral: true });
+                return interaction.editReply({ embeds: [embed] });
             }
             
             // Find current rank
@@ -670,8 +671,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
                     break;
                 }
             }
-            
-            await interaction.deferReply();
             
             const canvas = createCanvas(800, 400);
             const ctx = canvas.getContext('2d');
