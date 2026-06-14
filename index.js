@@ -1052,6 +1052,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
                 if (!interaction.replied) await interaction.reply({ content: "An error occurred while denying.", ephemeral: true });
             }
         }
+    }
     } catch (err) {
         console.error("Interaction error:", err);
         try {
