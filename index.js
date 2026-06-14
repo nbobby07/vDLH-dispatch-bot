@@ -32,6 +32,30 @@ async function sendAuditLog(guild, message) {
     }
 }
 
+// Helper to determine route boost multiplier
+async function getFlightsToAward(dep, arr) {
+    let flightsToAward = 1;
+    try {
+        const activeBoostStr = await db.getSetting('ACTIVE_BOOST');
+        if (activeBoostStr) {
+            const boost = JSON.parse(activeBoostStr);
+            let applies = false;
+            if (boost.mode === 'ANY' && (dep === boost.airport1 || arr === boost.airport1)) applies = true;
+            else if (boost.mode === 'DEP' && dep === boost.airport1) applies = true;
+            else if (boost.mode === 'ARR' && arr === boost.airport1) applies = true;
+            else if (boost.mode === 'ROUTE' && dep === boost.airport1 && arr === boost.airport2) applies = true;
+            else if (!boost.mode) applies = true; // Global boost
+
+            if (applies) {
+                flightsToAward = boost.multiplier;
+            }
+        }
+    } catch (err) {
+        console.error("Error reading active boost:", err);
+    }
+    return flightsToAward;
+}
+
 // Helper function to check promotions
 async function checkPromotions(member, userRecord, guild) {
     let newRankRole = null;
@@ -106,6 +130,19 @@ async function checkPromotions(member, userRecord, guild) {
     return { newRankRole, newRankName, planeOptions };
 }
 
+const AIRPORT_CHOICES = [
+    { name: 'EGLL', value: 'EGLL' },
+    { name: 'EGGD', value: 'EGGD' },
+    { name: 'EGLC', value: 'EGLC' },
+    { name: 'BIKF', value: 'BIKF' },
+    { name: 'NZAA', value: 'NZAA' },
+    { name: 'RJTT', value: 'RJTT' },
+    { name: 'YPPH', value: 'YPPH' },
+    { name: 'LCLK', value: 'LCLK' },
+    { name: 'LCPH', value: 'LCPH' },
+    { name: 'LGSK', value: 'LGSK' }
+];
+
 client.once(Events.ClientReady, async (c) => {
     console.log(`Ready! Logged in as ${c.user.tag}`);
     // Register slash commands
@@ -126,36 +163,14 @@ client.once(Events.ClientReady, async (c) => {
                     description: 'Departure ICAO', 
                     type: 3, 
                     required: true,
-                    choices: [
-                        { name: 'EGLL', value: 'EGLL' },
-                        { name: 'EGGD', value: 'EGGD' },
-                        { name: 'EGLC', value: 'EGLC' },
-                        { name: 'BIKF', value: 'BIKF' },
-                        { name: 'NZAA', value: 'NZAA' },
-                        { name: 'RJTT', value: 'RJTT' },
-                        { name: 'YPPH', value: 'YPPH' },
-                        { name: 'LCLK', value: 'LCLK' },
-                        { name: 'LCPH', value: 'LCPH' },
-                        { name: 'LGSK', value: 'LGSK' }
-                    ]
+                    choices: AIRPORT_CHOICES
                 },
                 { 
                     name: 'arrival-airport', 
                     description: 'Arrival ICAO', 
                     type: 3, 
                     required: true,
-                    choices: [
-                        { name: 'EGLL', value: 'EGLL' },
-                        { name: 'EGGD', value: 'EGGD' },
-                        { name: 'EGLC', value: 'EGLC' },
-                        { name: 'BIKF', value: 'BIKF' },
-                        { name: 'NZAA', value: 'NZAA' },
-                        { name: 'RJTT', value: 'RJTT' },
-                        { name: 'YPPH', value: 'YPPH' },
-                        { name: 'LCLK', value: 'LCLK' },
-                        { name: 'LCPH', value: 'LCPH' },
-                        { name: 'LGSK', value: 'LGSK' }
-                    ]
+                    choices: AIRPORT_CHOICES
                 },
                 { name: 'route', description: 'Flight route', type: 3, required: true },
                 { name: 'proof', description: 'Screenshot of the flight summary', type: 11, required: true }
@@ -213,6 +228,28 @@ client.once(Events.ClientReady, async (c) => {
                 }
             ],
             default_member_permissions: '8' // Administrator
+        },
+        {
+            name: 'set-boost',
+            description: 'Set a flight log multiplier for specific routes',
+            default_member_permissions: '8', // Administrator
+            options: [
+                { name: 'multiplier', description: 'e.g., 2 for 2x flights (0 or 1 to clear boost)', type: 4, required: true },
+                { 
+                    name: 'mode', 
+                    description: 'How to apply the boost', 
+                    type: 3, 
+                    required: false,
+                    choices: [
+                        { name: 'To/From (Either)', value: 'ANY' },
+                        { name: 'Departure Only', value: 'DEP' },
+                        { name: 'Arrival Only', value: 'ARR' },
+                        { name: 'Specific Route (A to B)', value: 'ROUTE' }
+                    ]
+                },
+                { name: 'airport1', description: 'Primary airport (or Departure if Specific Route)', type: 3, required: false, choices: AIRPORT_CHOICES },
+                { name: 'airport2', description: 'Arrival airport (Only if Specific Route)', type: 3, required: false, choices: AIRPORT_CHOICES }
+            ]
         }
     ];
     const rest = new REST().setToken(process.env.DISCORD_TOKEN);
@@ -447,7 +484,9 @@ client.on(Events.InteractionCreate, async (interaction) => {
             }
 
             if (autoApproved) {
-                const updatedUser = await db.incrementFlightCount(pilotUser.id);
+                const flightsToAward = await getFlightsToAward(dep, arr);
+                const updatedUser = await db.incrementFlightCount(pilotUser.id, flightsToAward);
+                const boostText = flightsToAward > 1 ? ` (+${flightsToAward} Route Boost!)` : ``;
                 try {
                     const member = await interaction.guild.members.fetch(pilotUser.id);
                     const promo = await checkPromotions(member, updatedUser, interaction.guild);
@@ -481,9 +520,9 @@ client.on(Events.InteractionCreate, async (interaction) => {
                         await member.send({ embeds: [embed] });
                     } else {
                         const embed = new EmbedBuilder()
-                            .setTitle("Flight Log Verified (AI)")
-                            .setColor("#00FF00")
-                            .setDescription(`Your flight log was Auto-Approved by AI! You now have **${updatedUser.flightCount}** flights.`);
+                        .setTitle("Flight Log Verified (AI)")
+                        .setColor("#00FF00")
+                        .setDescription(`Your flight log for **${callsign}** (${dep} ➔ ${arr}) was automatically verified by AI.\nYou now have **${updatedUser.flightCount}** flights${boostText}.`);
                         await member.send({ embeds: [embed] });
                     }
                 } catch (err) {
@@ -641,6 +680,42 @@ client.on(Events.InteractionCreate, async (interaction) => {
             await db.setSetting('LOG_CHANNEL_ID', targetChannel.id);
             const embed = new EmbedBuilder().setColor("#00FF00").setDescription(`Flight logs are now restricted to <#${targetChannel.id}>.`);
             await interaction.reply({ embeds: [embed], ephemeral: true });
+        } else if (interaction.commandName === 'set-boost') {
+            if (!interaction.member.permissions.has('Administrator')) {
+                const embed = new EmbedBuilder().setColor("#FF0000").setDescription("You do not have permission to use this command.");
+                return interaction.reply({ embeds: [embed], ephemeral: true });
+            }
+            
+            const multiplier = interaction.options.getInteger('multiplier');
+            
+            if (multiplier <= 1) {
+                await db.setSetting('ACTIVE_BOOST', '');
+                const embed = new EmbedBuilder().setColor("#00FF00").setDescription("Route Boost has been disabled.");
+                return interaction.reply({ embeds: [embed] });
+            }
+            
+            const mode = interaction.options.getString('mode');
+            const airport1 = interaction.options.getString('airport1');
+            const airport2 = interaction.options.getString('airport2');
+            
+            const boostConfig = {
+                multiplier,
+                mode: mode || null,
+                airport1: airport1 || null,
+                airport2: airport2 || null
+            };
+            
+            await db.setSetting('ACTIVE_BOOST', JSON.stringify(boostConfig));
+            
+            let desc = `A **${multiplier}x** flight log multiplier has been activated!\n\n`;
+            if (mode === 'ANY' && airport1) desc += `Applies to any flight To or From **${airport1}**`;
+            else if (mode === 'DEP' && airport1) desc += `Applies to flights departing from **${airport1}**`;
+            else if (mode === 'ARR' && airport1) desc += `Applies to flights arriving at **${airport1}**`;
+            else if (mode === 'ROUTE' && airport1 && airport2) desc += `Applies to flights from **${airport1}** to **${airport2}**`;
+            else desc += `Applies **GLOBALLY** to all flights!`;
+            
+            const embed = new EmbedBuilder().setColor("#00FF00").setTitle("🚀 Route Boost Active!").setDescription(desc);
+            await interaction.reply({ content: "@everyone", embeds: [embed] });
         }
     } else if (interaction.isStringSelectMenu()) {
         if (interaction.customId === 'select_plane') {
@@ -707,6 +782,11 @@ client.on(Events.InteractionCreate, async (interaction) => {
             const updatedEmbed = { ...embed.data };
             
             if (isApprove) {
+                const dep = embed.fields.find(f => f.name === "Departure")?.value;
+                const arr = embed.fields.find(f => f.name === "Arrival")?.value;
+                const flightsToAward = await getFlightsToAward(dep, arr);
+                const boostText = flightsToAward > 1 ? ` (+${flightsToAward} Route Boost!)` : ``;
+                
                 updatedEmbed.color = 0x00ff00; // Green
                 updatedEmbed.title = "Flight Log Approved";
                 updatedEmbed.fields.push({ name: "Reviewed By", value: `<@${interaction.user.id}>`, inline: false });
@@ -714,7 +794,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
                 await interaction.update({ embeds: [updatedEmbed], components: [] });
                 
                 // Process the promotion
-                const updatedUser = await db.incrementFlightCount(pilotId);
+                const updatedUser = await db.incrementFlightCount(pilotId, flightsToAward);
                 try {
                     const member = await interaction.guild.members.fetch(pilotId);
                     const promo = await checkPromotions(member, updatedUser, interaction.guild);
@@ -750,7 +830,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
                         const embed = new EmbedBuilder()
                             .setTitle("Flight Log Approved")
                             .setColor("#00FF00")
-                            .setDescription(`Your flight log was approved! You now have **${updatedUser.flightCount}** flights.`);
+                            .setDescription(`Your flight log was approved! You now have **${updatedUser.flightCount}** flights${boostText}.`);
                         await member.send({ embeds: [embed] });
                     }
                 } catch (err) {

@@ -48,10 +48,10 @@ module.exports = {
         );
         return { userId, flightCount: 0, unlockedPlanes: [] };
     },
-    incrementFlightCount: async (userId) => {
+    incrementFlightCount: async (userId, count = 1) => {
         const { rows } = await pool.query(
-            'INSERT INTO users (userId, flightCount, unlockedPlanes) VALUES ($1, 1, $2) ON CONFLICT (userId) DO UPDATE SET flightCount = users.flightCount + 1 RETURNING flightCount',
-            [userId, JSON.stringify([])]
+            'INSERT INTO users (userId, flightCount, unlockedPlanes) VALUES ($1, $2, $3) ON CONFLICT (userId) DO UPDATE SET flightCount = users.flightCount + $2 RETURNING flightCount',
+            [userId, count, JSON.stringify([])]
         );
         return { flightCount: rows[0].flightcount };
     },
