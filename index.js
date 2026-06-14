@@ -676,10 +676,44 @@ client.on(Events.InteractionCreate, async (interaction) => {
             const canvas = createCanvas(800, 400);
             const ctx = canvas.getContext('2d');
 
-            // Draw Background (Airline blue gradient)
+            let bgColors = ['#075AAA', '#032B4C'];
+            let headerColor = '#075AAA';
+            let titleColor = '#ffffff';
+            let subtitleColor = '#075AAA';
+
+            switch (currentRank) {
+                case "Cadet":
+                    bgColors = ['#4f5b66', '#343d46'];
+                    headerColor = '#4f5b66';
+                    subtitleColor = '#4f5b66';
+                    break;
+                case "Novice First Officer":
+                    bgColors = ['#075AAA', '#032B4C']; // Standard BA Blue
+                    break;
+                case "Senior First Officer":
+                    bgColors = ['#075AAA', '#800000']; // BA Blue to Deep Red
+                    break;
+                case "Novice Captain":
+                    bgColors = ['#032B4C', '#B8860B']; // Royal Blue to Gold
+                    headerColor = '#032B4C';
+                    break;
+                case "Senior Captain":
+                    bgColors = ['#1a1a1a', '#B8860B']; // Black to Gold
+                    headerColor = '#1a1a1a';
+                    titleColor = '#B8860B'; // Gold text!
+                    subtitleColor = '#B8860B';
+                    break;
+                case "Special Aircraft":
+                    bgColors = ['#1a1a1a', '#000000']; // Pure Midnight
+                    headerColor = '#000000';
+                    titleColor = '#e5e4e2'; // Platinum Text
+                    subtitleColor = '#1a1a1a';
+                    break;
+            }
+
             const gradient = ctx.createLinearGradient(0, 0, 800, 400);
-            gradient.addColorStop(0, '#075AAA');
-            gradient.addColorStop(1, '#032B4C');
+            gradient.addColorStop(0, bgColors[0]);
+            gradient.addColorStop(1, bgColors[1]);
             ctx.fillStyle = gradient;
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
@@ -695,18 +729,18 @@ client.on(Events.InteractionCreate, async (interaction) => {
             ctx.shadowColor = 'transparent'; // Reset shadow
 
             // Draw header bar
-            ctx.fillStyle = '#075AAA';
+            ctx.fillStyle = headerColor;
             ctx.beginPath();
             ctx.roundRect(40, 40, 720, 60, [15, 15, 0, 0]);
             ctx.fill();
 
             // Header Text
-            ctx.fillStyle = '#ffffff';
+            ctx.fillStyle = titleColor;
             ctx.font = 'bold 30px sans-serif';
             ctx.fillText('BRITISH AIRWAYS', 60, 80);
 
             // Subtitle
-            ctx.fillStyle = '#075AAA';
+            ctx.fillStyle = subtitleColor;
             ctx.font = 'bold 24px sans-serif';
             ctx.fillText('AIRLINE TRANSPORT PILOT CERTIFICATE', 60, 140);
 
