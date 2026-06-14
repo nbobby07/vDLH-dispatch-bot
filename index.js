@@ -1051,6 +1051,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
         }
     } else if (interaction.isModalSubmit()) {
         if (interaction.customId.startsWith('deny_reason_modal_')) {
+            await interaction.deferReply({ ephemeral: true });
             const parts = interaction.customId.split('_');
             const pilotId = parts[3];
             const msgId = parts[4];
@@ -1068,7 +1069,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
                 updatedEmbed.fields.push({ name: "Reason", value: reason, inline: false });
                 
                 await originalMsg.edit({ embeds: [updatedEmbed], components: [] });
-                await interaction.reply({ content: "Flight log denied successfully.", ephemeral: true });
+                await interaction.editReply({ content: "Flight log denied successfully." });
                 
                 // Tag thread if applicable
                 if (interaction.channel.isThread()) {
@@ -1093,7 +1094,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
                 } catch (err) {}
             } catch (err) {
                 console.error("Modal submit error:", err);
-                if (!interaction.replied) await interaction.reply({ content: "An error occurred while denying.", ephemeral: true });
+                await interaction.editReply({ content: "An error occurred while denying." });
             }
         }
     }
