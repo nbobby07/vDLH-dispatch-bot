@@ -378,7 +378,8 @@ client.on(Events.MessageCreate, async (message) => {
 });
 
 client.on(Events.InteractionCreate, async (interaction) => {
-    if (interaction.isChatInputCommand()) {
+    try {
+        if (interaction.isChatInputCommand()) {
         if (interaction.commandName === 'register') {
             // Make sure they are in the database
             let user = await db.getUser(interaction.user.id);
@@ -1051,7 +1052,26 @@ client.on(Events.InteractionCreate, async (interaction) => {
                 if (!interaction.replied) await interaction.reply({ content: "An error occurred while denying.", ephemeral: true });
             }
         }
+    } catch (err) {
+        console.error("Interaction error:", err);
+        try {
+            if (interaction.isRepliable() && !interaction.replied && !interaction.deferred) {
+                await interaction.reply({ content: "An error occurred while processing this command.", ephemeral: true });
+            } else if (interaction.isRepliable() && interaction.deferred) {
+                await interaction.editReply({ content: "An error occurred while processing this command.", embeds: [], components: [] });
+            }
+        } catch (replyErr) {
+            console.error("Failed to send error reply:", replyErr);
+        }
     }
+});
+
+process.on('unhandledRejection', error => {
+    console.error('Unhandled promise rejection:', error);
+});
+
+process.on('uncaughtException', error => {
+    console.error('Uncaught exception:', error);
 });
 
 client.login(process.env.DISCORD_TOKEN);
