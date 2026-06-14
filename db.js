@@ -69,6 +69,10 @@ module.exports = {
         const { rows } = await pool.query('SELECT userId, flightCount FROM users ORDER BY flightCount DESC LIMIT $1', [limit]);
         return rows.map(r => ({ userId: r.userid, flightCount: r.flightcount }));
     },
+    getAllPilots: async () => {
+        const { rows } = await pool.query('SELECT userId, flightCount FROM users ORDER BY flightCount DESC');
+        return rows.map(r => ({ userId: r.userid, flightCount: r.flightcount }));
+    },
     setFlightCount: async (userId, count) => {
         await pool.query(
             'INSERT INTO users (userId, flightCount, unlockedPlanes) VALUES ($1, $2, $3) ON CONFLICT (userId) DO UPDATE SET flightCount = $2',

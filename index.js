@@ -1,5 +1,5 @@
 require('dotenv').config();
-const { Client, GatewayIntentBits, Partials, Events, StringSelectMenuBuilder, StringSelectMenuOptionBuilder, ActionRowBuilder, REST, Routes, ButtonBuilder, ButtonStyle, EmbedBuilder, AttachmentBuilder } = require('discord.js');
+const { Client, GatewayIntentBits, Partials, Events, StringSelectMenuBuilder, StringSelectMenuOptionBuilder, ActionRowBuilder, REST, Routes, ButtonBuilder, ButtonStyle, EmbedBuilder, AttachmentBuilder, ModalBuilder, TextInputBuilder, TextInputStyle } = require('discord.js');
 const { createCanvas, loadImage, GlobalFonts } = require('@napi-rs/canvas');
 const db = require('./db');
 const config = require('./config');
@@ -20,6 +20,48 @@ const client = new Client({
     ],
     partials: [Partials.Message, Partials.Channel]
 });
+
+// Helper for roster pagination
+async function getRosterPage(pageIndex) {
+    const allPilots = await db.getAllPilots();
+    const itemsPerPage = 10;
+    const totalPages = Math.ceil(allPilots.length / itemsPerPage) || 1;
+    const page = Math.max(0, Math.min(pageIndex, totalPages - 1));
+    
+    const startIdx = page * itemsPerPage;
+    const pagePilots = allPilots.slice(startIdx, startIdx + itemsPerPage);
+    
+    let desc = "";
+    if (pagePilots.length === 0) {
+        desc = "No pilots found!";
+    } else {
+        for (let i = 0; i < pagePilots.length; i++) {
+            desc += `**${startIdx + i + 1}.** <@${pagePilots[i].userId}> - ${pagePilots[i].flightCount} flights\n`;
+        }
+    }
+    
+    const embed = new EmbedBuilder()
+        .setTitle(`Airline Pilot Roster`)
+        .setDescription(desc)
+        .setColor("#075AAA")
+        .setFooter({ text: `Page ${page + 1} of ${totalPages} | Total Pilots: ${allPilots.length}` });
+        
+    const prevBtn = new ButtonBuilder()
+        .setCustomId(`roster_prev_${page}`)
+        .setLabel("⬅️ Previous")
+        .setStyle(ButtonStyle.Primary)
+        .setDisabled(page === 0);
+        
+    const nextBtn = new ButtonBuilder()
+        .setCustomId(`roster_next_${page}`)
+        .setLabel("Next ➡️")
+        .setStyle(ButtonStyle.Primary)
+        .setDisabled(page >= totalPages - 1);
+        
+    const row = new ActionRowBuilder().addComponents(prevBtn, nextBtn);
+    
+    return { embeds: [embed], components: [row] };
+}
 
 // Helper to send audit log
 async function sendAuditLog(guild, message) {
@@ -228,6 +270,11 @@ client.once(Events.ClientReady, async (c) => {
                     required: true
                 }
             ],
+            default_member_permissions: '8' // Administrator
+        },
+        {
+            name: 'roster',
+            description: 'View the full airline pilot roster (Staff only)',
             default_member_permissions: '8' // Administrator
         },
         {
@@ -599,6 +646,13 @@ client.on(Events.InteractionCreate, async (interaction) => {
                 .setDescription(desc)
                 .setColor("#075AAA");
             await interaction.reply({ embeds: [embed] });
+        } else if (interaction.commandName === 'roster') {
+            if (!interaction.member.permissions.has('Administrator')) {
+                const embed = new EmbedBuilder().setColor("#FF0000").setDescription("You do not have permission to view the full roster.");
+                return interaction.reply({ embeds: [embed], ephemeral: true });
+            }
+            const pageData = await getRosterPage(0);
+            await interaction.reply(pageData);
         } else if (interaction.commandName === 'profile') {
             const targetUser = interaction.options.getUser('user') || interaction.user;
             const userRecord = await db.getUser(targetUser.id);
@@ -838,6 +892,18 @@ client.on(Events.InteractionCreate, async (interaction) => {
     } else if (interaction.isButton()) {
         const dispatcherRoleId = config.DISPATCHER_ROLE_ID;
         
+        if (interaction.customId.startsWith('roster_prev_')) {
+            const currentPage = parseInt(interaction.customId.split('_')[2], 10);
+            const pageData = await getRosterPage(currentPage - 1);
+            await interaction.update(pageData);
+            return;
+        } else if (interaction.customId.startsWith('roster_next_')) {
+            const currentPage = parseInt(interaction.customId.split('_')[2], 10);
+            const pageData = await getRosterPage(currentPage + 1);
+            await interaction.update(pageData);
+            return;
+        }
+        
         if (interaction.customId.startsWith('approve_flight_') || interaction.customId.startsWith('deny_flight_')) {
             // Check permissions
             if (!interaction.member.permissions.has('Administrator') && !interaction.member.roles.cache.has(dispatcherRoleId)) {
@@ -907,21 +973,83 @@ client.on(Events.InteractionCreate, async (interaction) => {
                 } catch (err) {
                     console.error("Error updating member on approve:", err);
                 }
+                
+                // Tag thread if applicable
+                if (interaction.channel.isThread()) {
+                    const parentChannel = interaction.channel.parent;
+                    if (parentChannel && parentChannel.availableTags) {
+                        const approvedTag = parentChannel.availableTags.find(t => t.name.toLowerCase() === 'approved');
+                        if (approvedTag) {
+                            const newTags = new Set(interaction.channel.appliedTags);
+                            newTags.add(approvedTag.id);
+                            await interaction.channel.setAppliedTags(Array.from(newTags));
+                        }
+                    }
+                }
             } else {
+                // Deny flight: Launch a modal
+                const modal = new ModalBuilder()
+                    .setCustomId(`deny_reason_modal_${pilotId}_${interaction.message.id}`)
+                    .setTitle('Deny Flight Log');
+
+                const reasonInput = new TextInputBuilder()
+                    .setCustomId('deny_reason_input')
+                    .setLabel('Reason for denial')
+                    .setStyle(TextInputStyle.Paragraph)
+                    .setRequired(true)
+                    .setPlaceholder('e.g., Missing screenshot, wrong callsign...');
+
+                const firstActionRow = new ActionRowBuilder().addComponents(reasonInput);
+                modal.addComponents(firstActionRow);
+                
+                await interaction.showModal(modal);
+            }
+        }
+    } else if (interaction.isModalSubmit()) {
+        if (interaction.customId.startsWith('deny_reason_modal_')) {
+            const parts = interaction.customId.split('_');
+            const pilotId = parts[3];
+            const msgId = parts[4];
+            
+            const reason = interaction.fields.getTextInputValue('deny_reason_input');
+            
+            try {
+                const originalMsg = await interaction.channel.messages.fetch(msgId);
+                const embed = originalMsg.embeds[0];
+                const updatedEmbed = { ...embed.data };
+                
                 updatedEmbed.color = 0xff0000; // Red
                 updatedEmbed.title = "Flight Log Denied";
                 updatedEmbed.fields.push({ name: "Reviewed By", value: `<@${interaction.user.id}>`, inline: false });
+                updatedEmbed.fields.push({ name: "Reason", value: reason, inline: false });
                 
-                await interaction.update({ embeds: [updatedEmbed], components: [] });
+                await originalMsg.edit({ embeds: [updatedEmbed], components: [] });
+                await interaction.reply({ content: "Flight log denied successfully.", ephemeral: true });
                 
+                // Tag thread if applicable
+                if (interaction.channel.isThread()) {
+                    const parentChannel = interaction.channel.parent;
+                    if (parentChannel && parentChannel.availableTags) {
+                        const deniedTag = parentChannel.availableTags.find(t => t.name.toLowerCase() === 'denied');
+                        if (deniedTag) {
+                            const newTags = new Set(interaction.channel.appliedTags);
+                            newTags.add(deniedTag.id);
+                            await interaction.channel.setAppliedTags(Array.from(newTags));
+                        }
+                    }
+                }
+
                 try {
                     const member = await interaction.guild.members.fetch(pilotId);
-                    const embed = new EmbedBuilder()
+                    const dmEmbed = new EmbedBuilder()
                         .setTitle("Flight Log Denied")
                         .setColor("#FF0000")
-                        .setDescription("Your recent flight log was denied by a Dispatcher. Please ensure all your information and proof is correct.");
-                    await member.send({ embeds: [embed] });
+                        .setDescription(`Your recent flight log was denied by a Dispatcher.\n\n**Reason:** ${reason}\n\nPlease ensure all your information and proof is correct before submitting again.`);
+                    await member.send({ embeds: [dmEmbed] });
                 } catch (err) {}
+            } catch (err) {
+                console.error("Modal submit error:", err);
+                if (!interaction.replied) await interaction.reply({ content: "An error occurred while denying.", ephemeral: true });
             }
         }
     }
