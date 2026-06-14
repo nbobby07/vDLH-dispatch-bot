@@ -381,6 +381,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
     try {
         if (interaction.isChatInputCommand()) {
         if (interaction.commandName === 'register') {
+            await interaction.deferReply({ ephemeral: true });
             // Make sure they are in the database
             let user = await db.getUser(interaction.user.id);
             if (!user) user = await db.createUser(interaction.user.id);
@@ -391,7 +392,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
             
             if (alreadyUnlocked.length >= beginnerTier.canPick) {
                 const embed = new EmbedBuilder().setColor("#FF0000").setDescription("You have already registered and picked your cadet aircraft!");
-                return interaction.reply({ embeds: [embed], ephemeral: true });
+                return interaction.editReply({ embeds: [embed] });
             }
             
             // Give them the beginner rank role if they don't have it
@@ -424,21 +425,13 @@ client.on(Events.InteractionCreate, async (interaction) => {
                 .setColor("#075AAA")
                 .setDescription("Please select your cadet aircraft to get started:");
 
-            await interaction.reply({
+            await interaction.editReply({
                 embeds: [embed],
-                components: [row],
-                ephemeral: true
+                components: [row]
             });
         } else if (interaction.commandName === 'flight-log') {
             const userId = interaction.user.id;
             
-            // Check Channel Lock
-            const allowedChannelId = await db.getSetting('LOG_CHANNEL_ID');
-            if (allowedChannelId && interaction.channelId !== allowedChannelId) {
-                const embed = new EmbedBuilder().setColor("#FF0000").setDescription(`Please submit your flight logs in <#${allowedChannelId}>.`);
-                return interaction.reply({ embeds: [embed], ephemeral: true });
-            }
-
             // Check Cooldown
             const COOLDOWN_AMOUNT = 5 * 60 * 1000; // 5 minutes
             if (flightLogCooldowns.has(userId)) {
@@ -449,9 +442,17 @@ client.on(Events.InteractionCreate, async (interaction) => {
                     return interaction.reply({ embeds: [embed], ephemeral: true });
                 }
             }
-            flightLogCooldowns.set(userId, Date.now());
-
+            
             await interaction.deferReply();
+            
+            // Check Channel Lock
+            const allowedChannelId = await db.getSetting('LOG_CHANNEL_ID');
+            if (allowedChannelId && interaction.channelId !== allowedChannelId) {
+                const embed = new EmbedBuilder().setColor("#FF0000").setDescription(`Please submit your flight logs in <#${allowedChannelId}>.`);
+                return interaction.editReply({ embeds: [embed] });
+            }
+
+            flightLogCooldowns.set(userId, Date.now());
             
             const pilotUser = interaction.options.getUser('discord');
             const callsign = interaction.options.getString('callsign');
@@ -789,12 +790,13 @@ client.on(Events.InteractionCreate, async (interaction) => {
                 const embed = new EmbedBuilder().setColor("#FF0000").setDescription("You do not have permission to use this command.");
                 return interaction.reply({ embeds: [embed], ephemeral: true });
             }
+            await interaction.deferReply();
             const targetUser = interaction.options.getUser('user');
             const count = interaction.options.getInteger('count');
             
             await db.setFlightCount(targetUser.id, count);
             const embed = new EmbedBuilder().setColor("#00FF00").setDescription(`Successfully set <@${targetUser.id}>'s flight count to **${count}**.`);
-            await interaction.reply({ embeds: [embed], ephemeral: true });
+            await interaction.editReply({ embeds: [embed] });
             await sendAuditLog(interaction.guild, `**Admin Override**: <@${interaction.user.id}> manually set <@${targetUser.id}>'s flights to ${count}.`);
         } else if (interaction.commandName === 'setup-audit') {
             if (!interaction.member.permissions.has('Administrator')) {
