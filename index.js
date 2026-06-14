@@ -636,6 +636,10 @@ client.on(Events.InteractionCreate, async (interaction) => {
                 const row = new ActionRowBuilder().addComponents(approveBtn, denyBtn);
 
                 await interaction.editReply({ 
+                    content: "Flight log submitted and pending Dispatcher review."
+                });
+                
+                await interaction.channel.send({
                     content: `<@&${config.DISPATCHER_ROLE_ID}>`,
                     embeds: [embed], 
                     components: [row] 
