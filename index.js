@@ -576,7 +576,11 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
                 const row = new ActionRowBuilder().addComponents(approveBtn, denyBtn);
 
-                await interaction.editReply({ embeds: [embed], components: [row] });
+                await interaction.editReply({ 
+                    content: `<@&${config.DISPATCHER_ROLE_ID}>`,
+                    embeds: [embed], 
+                    components: [row] 
+                });
             }
         } else if (interaction.commandName === 'leaderboard') {
             const topPilots = await db.getTopPilots(10);
