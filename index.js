@@ -631,10 +631,11 @@ client.on(Events.InteractionCreate, async (interaction) => {
                 });
             }
         } else if (interaction.commandName === 'leaderboard') {
+            await interaction.deferReply();
             const topPilots = await db.getTopPilots(10);
             if (topPilots.length === 0) {
                 const embed = new EmbedBuilder().setColor("#FF0000").setDescription("No pilots found yet!");
-                return interaction.reply({ embeds: [embed], ephemeral: true });
+                return interaction.editReply({ embeds: [embed] });
             }
             
             let desc = "";
@@ -646,14 +647,15 @@ client.on(Events.InteractionCreate, async (interaction) => {
                 .setTitle("Top 10 Pilots")
                 .setDescription(desc)
                 .setColor("#075AAA");
-            await interaction.reply({ embeds: [embed] });
+            await interaction.editReply({ embeds: [embed] });
         } else if (interaction.commandName === 'roster') {
             if (!interaction.member.permissions.has('Administrator')) {
                 const embed = new EmbedBuilder().setColor("#FF0000").setDescription("You do not have permission to view the full roster.");
                 return interaction.reply({ embeds: [embed], ephemeral: true });
             }
+            await interaction.deferReply();
             const pageData = await getRosterPage(0);
-            await interaction.reply(pageData);
+            await interaction.editReply(pageData);
         } else if (interaction.commandName === 'profile') {
             await interaction.deferReply();
             const targetUser = interaction.options.getUser('user') || interaction.user;
@@ -878,13 +880,14 @@ client.on(Events.InteractionCreate, async (interaction) => {
         }
     } else if (interaction.isStringSelectMenu()) {
         if (interaction.customId === 'select_plane') {
+            await interaction.deferUpdate();
             const selectedPlane = interaction.values[0];
             
             // Make sure it's a valid plane
             const roleId = config.PLANE_ROLES[selectedPlane];
             if (!roleId || roleId.startsWith("ROLE_ID_")) {
                 const embed = new EmbedBuilder().setColor("#FF0000").setDescription(`You selected ${selectedPlane}, but the admins haven't set up the role ID for this plane yet.`);
-                return interaction.reply({ embeds: [embed], ephemeral: true });
+                return interaction.followUp({ embeds: [embed], ephemeral: true });
             }
             
             // Save to DB
@@ -897,7 +900,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
                 if (!member) {
                     if (!process.env.GUILD_ID) {
                         const embed = new EmbedBuilder().setColor("#FF0000").setDescription("The bot owner needs to set GUILD_ID in the .env file for me to give roles from DMs.");
-                        return interaction.reply({ embeds: [embed], ephemeral: true });
+                        return interaction.followUp({ embeds: [embed], ephemeral: true });
                     }
                     const guild = await client.guilds.fetch(process.env.GUILD_ID);
                     member = await guild.members.fetch(interaction.user.id);
@@ -909,7 +912,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
                     .setTitle("Aircraft Unlocked")
                     .setColor("#00FF00")
                     .setDescription(`Success! You have selected the **${selectedPlane}** and received the corresponding role. Happy flying!`);
-                await interaction.update({ 
+                await interaction.editReply({ 
                     embeds: [successEmbed],
                     components: [] 
                 });
@@ -917,7 +920,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
             } catch (err) {
                 console.error("Failed to give plane role:", err);
                 const errEmbed = new EmbedBuilder().setColor("#FF0000").setDescription(`You selected the ${selectedPlane}, but I couldn't assign the Discord role. Do I have permission to manage roles?`);
-                await interaction.update({ 
+                await interaction.editReply({ 
                     embeds: [errEmbed],
                     components: [] 
                 });
@@ -927,14 +930,16 @@ client.on(Events.InteractionCreate, async (interaction) => {
         const dispatcherRoleId = config.DISPATCHER_ROLE_ID;
         
         if (interaction.customId.startsWith('roster_prev_')) {
+            await interaction.deferUpdate();
             const currentPage = parseInt(interaction.customId.split('_')[2], 10);
             const pageData = await getRosterPage(currentPage - 1);
-            await interaction.update(pageData);
+            await interaction.editReply(pageData);
             return;
         } else if (interaction.customId.startsWith('roster_next_')) {
+            await interaction.deferUpdate();
             const currentPage = parseInt(interaction.customId.split('_')[2], 10);
             const pageData = await getRosterPage(currentPage + 1);
-            await interaction.update(pageData);
+            await interaction.editReply(pageData);
             return;
         }
         
@@ -953,6 +958,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
             const updatedEmbed = { ...embed.data };
             
             if (isApprove) {
+                await interaction.deferUpdate();
                 const dep = embed.fields.find(f => f.name === "Departure")?.value;
                 const arr = embed.fields.find(f => f.name === "Arrival")?.value;
                 const flightsToAward = await getFlightsToAward(dep, arr);
@@ -962,7 +968,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
                 updatedEmbed.title = "Flight Log Approved";
                 updatedEmbed.fields.push({ name: "Reviewed By", value: `<@${interaction.user.id}>`, inline: false });
                 
-                await interaction.update({ embeds: [updatedEmbed], components: [] });
+                await interaction.editReply({ embeds: [updatedEmbed], components: [] });
                 
                 // Process the promotion
                 const updatedUser = await db.incrementFlightCount(pilotId, flightsToAward);
