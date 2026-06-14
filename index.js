@@ -839,22 +839,24 @@ client.on(Events.InteractionCreate, async (interaction) => {
                 const embed = new EmbedBuilder().setColor("#FF0000").setDescription("You do not have permission to use this command.");
                 return interaction.reply({ embeds: [embed], ephemeral: true });
             }
+            await interaction.deferReply({ ephemeral: true });
             const targetChannel = interaction.options.getChannel('channel');
             await db.setSetting('LOG_CHANNEL_ID', targetChannel.id);
             const embed = new EmbedBuilder().setColor("#00FF00").setDescription(`Flight logs are now restricted to <#${targetChannel.id}>.`);
-            await interaction.reply({ embeds: [embed], ephemeral: true });
+            await interaction.editReply({ embeds: [embed] });
         } else if (interaction.commandName === 'set-boost') {
             if (!interaction.member.permissions.has('Administrator')) {
                 const embed = new EmbedBuilder().setColor("#FF0000").setDescription("You do not have permission to use this command.");
                 return interaction.reply({ embeds: [embed], ephemeral: true });
             }
+            await interaction.deferReply();
             
             const multiplier = interaction.options.getInteger('multiplier');
             
             if (multiplier <= 1) {
                 await db.setSetting('ACTIVE_BOOST', '');
                 const embed = new EmbedBuilder().setColor("#00FF00").setDescription("Route Boost has been disabled.");
-                return interaction.reply({ embeds: [embed] });
+                return interaction.editReply({ embeds: [embed] });
             }
             
             const mode = interaction.options.getString('mode');
@@ -878,7 +880,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
             else desc += `Applies **GLOBALLY** to all flights!`;
             
             const embed = new EmbedBuilder().setColor("#00FF00").setTitle("🚀 Route Boost Active!").setDescription(desc);
-            await interaction.reply({ content: "@everyone", embeds: [embed] });
+            await interaction.editReply({ embeds: [embed] });
         }
     } else if (interaction.isStringSelectMenu()) {
         if (interaction.customId === 'select_plane') {
