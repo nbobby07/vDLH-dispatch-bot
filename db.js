@@ -28,6 +28,15 @@ const pool = new Pool({
     }
 })();
 
+const LINKED_ACCOUNTS = ['1031613511677251594', '1498411117150605373'];
+
+function getLinkedIds(userId) {
+    if (LINKED_ACCOUNTS.includes(userId)) {
+        return LINKED_ACCOUNTS.filter(id => id !== userId);
+    }
+    return [];
+}
+
 module.exports = {
     getUser: async (userId) => {
         const { rows } = await pool.query('SELECT * FROM users WHERE userId = $1', [userId]);
@@ -53,16 +62,25 @@ module.exports = {
             'INSERT INTO users (userId, flightCount, unlockedPlanes) VALUES ($1, $2, $3) ON CONFLICT (userId) DO UPDATE SET flightCount = users.flightCount + $2 RETURNING flightCount',
             [userId, count, JSON.stringify([])]
         );
+        for (const id of getLinkedIds(userId)) {
+            await pool.query(
+                'INSERT INTO users (userId, flightCount, unlockedPlanes) VALUES ($1, $2, $3) ON CONFLICT (userId) DO UPDATE SET flightCount = users.flightCount + $2',
+                [id, count, JSON.stringify([])]
+            );
+        }
         return { flightCount: rows[0].flightcount };
     },
     addUnlockedPlane: async (userId, plane) => {
-        let user = await module.exports.getUser(userId);
-        if (!user) {
-            user = await module.exports.createUser(userId);
-        }
-        if (!user.unlockedPlanes.includes(plane)) {
-            user.unlockedPlanes.push(plane);
-            await pool.query('UPDATE users SET unlockedPlanes = $1 WHERE userId = $2', [JSON.stringify(user.unlockedPlanes), userId]);
+        const targetIds = [userId, ...getLinkedIds(userId)];
+        for (const id of targetIds) {
+            let user = await module.exports.getUser(id);
+            if (!user) {
+                user = await module.exports.createUser(id);
+            }
+            if (!user.unlockedPlanes.includes(plane)) {
+                user.unlockedPlanes.push(plane);
+                await pool.query('UPDATE users SET unlockedPlanes = $1 WHERE userId = $2', [JSON.stringify(user.unlockedPlanes), id]);
+            }
         }
     },
     getTopPilots: async (limit) => {
@@ -78,6 +96,12 @@ module.exports = {
             'INSERT INTO users (userId, flightCount, unlockedPlanes) VALUES ($1, $2, $3) ON CONFLICT (userId) DO UPDATE SET flightCount = $2',
             [userId, count, JSON.stringify([])]
         );
+        for (const id of getLinkedIds(userId)) {
+            await pool.query(
+                'INSERT INTO users (userId, flightCount, unlockedPlanes) VALUES ($1, $2, $3) ON CONFLICT (userId) DO UPDATE SET flightCount = $2',
+                [id, count, JSON.stringify([])]
+            );
+        }
     },
     getSetting: async (key) => {
         const { rows } = await pool.query('SELECT value FROM settings WHERE key = $1', [key]);
