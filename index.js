@@ -78,7 +78,7 @@ async function checkPromotions(member, userRecord, guild) {
                 }
             }
             
-            if (tier.flightsRequired > 0) { // Don't announce beginner rank
+            if (tier.flightsRequired > 0) { // Don't announce cadet rank
                 await sendAuditLog(guild, `**Promotion**: <@${member.id}> has been promoted to **${tier.rankName}**! (Flights: ${userRecord.flightCount})`);
             }
         } else if (tier.rankRoleId !== "NO ROLE FOR THIS RANK" && !tier.rankRoleId.startsWith("ROLE_ID_") && !member.roles.cache.has(tier.rankRoleId)) {
@@ -112,7 +112,7 @@ client.once(Events.ClientReady, async (c) => {
     const commands = [
         {
             name: 'register',
-            description: 'Register for vBA and select your beginner aircraft!'
+            description: 'Register for vBA and select your cadet aircraft!'
         },
         {
             name: 'flight-log',
@@ -304,7 +304,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
             const alreadyUnlocked = beginnerTier.unlocks.filter(p => user.unlockedPlanes.includes(p));
             
             if (alreadyUnlocked.length >= beginnerTier.canPick) {
-                const embed = new EmbedBuilder().setColor("#FF0000").setDescription("You have already registered and picked your beginner aircraft!");
+                const embed = new EmbedBuilder().setColor("#FF0000").setDescription("You have already registered and picked your cadet aircraft!");
                 return interaction.reply({ embeds: [embed], ephemeral: true });
             }
             
@@ -322,7 +322,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
             
             const selectMenu = new StringSelectMenuBuilder()
                 .setCustomId('select_plane')
-                .setPlaceholder('Select your beginner aircraft')
+                .setPlaceholder('Select your cadet aircraft')
                 .addOptions(
                     optionsToPick.map(plane => 
                         new StringSelectMenuOptionBuilder()
@@ -336,7 +336,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
             const embed = new EmbedBuilder()
                 .setTitle("Welcome to Virtual Roblox Airlines!")
                 .setColor("#075AAA")
-                .setDescription("Please select your beginner aircraft to get started:");
+                .setDescription("Please select your cadet aircraft to get started:");
 
             await interaction.reply({
                 embeds: [embed],
@@ -565,7 +565,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
             }
             
             // Find current rank
-            let currentRank = "Beginner";
+            let currentRank = "Cadet";
             for (let i = config.PROMOTIONS.length - 1; i >= 0; i--) {
                 if (userRecord.flightCount >= config.PROMOTIONS[i].flightsRequired) {
                     currentRank = config.PROMOTIONS[i].rankName;

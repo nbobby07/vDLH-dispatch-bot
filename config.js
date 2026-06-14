@@ -11,7 +11,7 @@ module.exports = {
     PROMOTIONS: [
         {
             flightsRequired: 0,
-            rankName: "Beginner",
+            rankName: "Cadet",
             rankRoleId: "1506356938823303178",
             unlocks: ["CRJ200LR", "ATR72"],
             canPick: 1
