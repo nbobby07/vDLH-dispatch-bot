@@ -627,6 +627,19 @@ Return a valid JSON object ONLY:
                 };
                 await interaction.editReply({ embeds: [embed] });
 
+                // Tag thread if applicable
+                if (interaction.channel.isThread()) {
+                    const parentChannel = interaction.channel.parent;
+                    if (parentChannel && parentChannel.availableTags) {
+                        const approvedTag = parentChannel.availableTags.find(t => t.name.toLowerCase() === 'approved');
+                        if (approvedTag) {
+                            const newTags = new Set(interaction.channel.appliedTags);
+                            newTags.add(approvedTag.id);
+                            await interaction.channel.setAppliedTags(Array.from(newTags));
+                        }
+                    }
+                }
+
             } else {
                 const embed = {
                     title: "Pending Flight Log Submission (AI Flagged)",
