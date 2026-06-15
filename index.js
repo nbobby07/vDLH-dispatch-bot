@@ -494,23 +494,48 @@ client.on(Events.InteractionCreate, async (interaction) => {
                                     }
                                 },
                                 {
-                                    text: `Verify the flight log screenshot. Extract the following fields as JSON ONLY:\n` +
-                                          `- callsign (string)\n` +
-                                          `- aircraft (string)\n` +
-                                          `- departure (string, ICAO code)\n` +
-                                          `- arrival (string, ICAO code)\n\n` +
-                                          `Note: The screenshot uses custom in-game airport codes. You MUST map them to their real-world ICAO codes before returning the JSON:\n` +
-                                          `- IRFD -> EGLL\n` +
-                                          `- IMLR -> EGGD\n` +
-                                          `- ISAU -> EGLC\n` +
-                                          `- IKFL -> BIKF\n` +
-                                          `- IBTH -> LGSK\n` +
-                                          `- ILAR -> LCLK\n` +
-                                          `- IPAP -> LCPH\n` +
-                                          `- ITKO -> RJTT\n` +
-                                          `- IPPH -> YPPH\n` +
-                                          `- IZOL -> NZAA\n\n` +
-                                          `Return a valid JSON object with those 4 keys exactly. Nothing else.`
+                                    text: `You are an AI Flight Dispatcher. Verify the flight log screenshot against the user's submission.
+
+User Submission:
+- Discord Username: ${interaction.user.username} (or global name: ${interaction.user.globalName || 'none'})
+- Callsign: ${callsign}
+- Aircraft: ${aircraft}
+- Departure: ${dep}
+- Arrival: ${arr}
+
+Rules for Approval:
+1. Username: The "PLAYER NAME" on screen must loosely match the Discord Username or Global Name.
+2. Aircraft, Departure, and Arrival must match the submission.
+   *CRITICAL*: The screenshot uses custom in-game airport codes. You MUST map them to real-world ICAO codes before comparing:
+   - IRFD -> EGLL
+   - IMLR -> EGGD
+   - ISAU -> EGLC
+   - IKFL -> BIKF
+   - IBTH -> LGSK
+   - ILAR -> LCLK
+   - IPAP -> LCPH
+   - ITKO -> RJTT
+   - IPPH -> YPPH
+   - IZOL -> NZAA
+3. Callsign: The callsign on screen can have extra characters, dashes, or missing digits compared to the submission (e.g., expected BAW7 but got BAW7393, or SHT21B vs SHT-21B). Allow fuzzy matching.
+4. Callsign Route Rules: The callsign prefix MUST match the route type:
+   - SHT: Between 2 UK airports (e.g., EGLL, EGGD, EGCC, EGHI, EGLC).
+   - CFE: International flight out of EGHI.
+   - EFW: International flight out of EGGD.
+   - BAW: International flight out of EGCC (or EGLL / general international).
+
+Return a valid JSON object ONLY:
+{
+  "approved": boolean,
+  "reasoning": "Short string explaining why it was approved or what mismatched.",
+  "extracted": {
+    "username": "...",
+    "callsign": "...",
+    "aircraft": "...",
+    "departure": "...",
+    "arrival": "..."
+  }
+}`
                                 }
                             ]
                         }
@@ -525,19 +550,14 @@ client.on(Events.InteractionCreate, async (interaction) => {
                 aiOutput = aiOutput.replace(/```json/g, "").replace(/```/g, "").trim();
                 const data = JSON.parse(aiOutput);
 
-                const aiCallsign = (data.callsign || "").toString().trim().toUpperCase();
-                const aiAircraft = (data.aircraft || "").toString().trim().toUpperCase();
-                const aiDep = (data.departure || "").toString().trim().toUpperCase();
-                const aiArr = (data.arrival || "").toString().trim().toUpperCase();
-
-                if (aiCallsign === callsign.toUpperCase() &&
-                    aiAircraft === aircraft.toUpperCase() &&
-                    aiDep === dep.toUpperCase() &&
-                    aiArr === arr.toUpperCase()) {
+                if (data.approved) {
                     autoApproved = true;
-                    aiReasoning = "AI perfectly matched all fields with the screenshot.";
+                    aiReasoning = data.reasoning || "AI perfectly matched and verified the log.";
                 } else {
-                    aiReasoning = `AI mismatch detected. \nExpected: ${callsign}, ${aircraft}, ${dep}, ${arr}\nGot: ${aiCallsign}, ${aiAircraft}, ${aiDep}, ${aiArr}`;
+                    aiReasoning = data.reasoning || "AI mismatch detected.";
+                    if (data.extracted) {
+                        aiReasoning += `\nExtracted from image: ${data.extracted.callsign}, ${data.extracted.aircraft}, ${data.extracted.departure}, ${data.extracted.arrival}`;
+                    }
                 }
             } catch (err) {
                 console.error("OpenAI verification error:", err);
