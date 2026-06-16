@@ -463,6 +463,12 @@ client.on(Events.InteractionCreate, async (interaction) => {
             const route = interaction.options.getString('route');
             const proof = interaction.options.getAttachment('proof');
 
+            let pilotMember = null;
+            try {
+                pilotMember = await interaction.guild.members.fetch(pilotUser.id);
+            } catch (err) {}
+            const pilotDisplayName = pilotMember ? pilotMember.displayName : pilotUser.username;
+
             let autoApproved = false;
             let aiReasoning = "AI verification failed or was not completely confident.";
             
@@ -497,14 +503,14 @@ client.on(Events.InteractionCreate, async (interaction) => {
                                     text: `You are an AI Flight Dispatcher. Verify the flight log screenshot against the user's submission.
 
 User Submission:
-- Discord Username: ${interaction.user.username} (or global name: ${interaction.user.globalName || 'none'})
+- Discord Username: ${pilotUser.username} (Global: ${pilotUser.globalName || 'none'}, Server Nickname: ${pilotDisplayName})
 - Callsign: ${callsign}
 - Aircraft: ${aircraft}
 - Departure: ${dep}
 - Arrival: ${arr}
 
 Rules for Approval:
-1. Username: The "PLAYER NAME" on screen must loosely match the Discord Username or Global Name.
+1. Username: The "PLAYER NAME" on screen must loosely match the Discord Username, Global Name, OR Server Nickname.
 2. Departure and Arrival must match the submission exactly.
    *CRITICAL*: The screenshot uses custom in-game airport codes. You MUST map them to real-world ICAO codes before comparing:
    - IRFD -> EGLL
