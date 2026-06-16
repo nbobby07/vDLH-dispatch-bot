@@ -512,6 +512,7 @@ User Submission:
 Rules for Approval:
 1. Username: The "PLAYER NAME" on screen must loosely match the Discord Username, Global Name, OR Server Nickname.
 2. Departure and Arrival must match the submission exactly.
+   *HINT*: In the flight info panel on the screenshot, the airport on the LEFT is the Departure, and the airport on the RIGHT is the Arrival. Do not swap them.
    *CRITICAL*: The screenshot uses custom in-game airport codes. You MUST map them to real-world ICAO codes before comparing:
    - IRFD -> EGLL
    - IMLR -> EGGD
@@ -527,9 +528,9 @@ Rules for Approval:
 4. Callsign: The callsign on screen can have extra characters, dashes, or missing digits compared to the submission (e.g., expected BAW7 but got BAW7393, or SHT21B vs SHT-21B). Allow fuzzy matching.
 5. Callsign Route Rules: The callsign prefix MUST match the route type:
    - SHT: Between 2 UK airports (e.g., EGLL, EGGD, EGCC, EGHI, EGLC).
-   - CFE: International flight out of EGHI.
+   - CFE: International flight out of EGLC.
    - EFW: International flight out of EGGD.
-   - BAW: International flight out of EGCC (or EGLL / general international).
+   - BAW: International flight out of EGLL (or EGCC / general international).
 
 Return a valid JSON object ONLY:
 {
