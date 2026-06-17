@@ -772,7 +772,7 @@ Return a valid JSON object ONLY:
             }
 
             if (isOwner) {
-                currentRank = "Owner / Creator";
+                currentRank = "Founder";
                 bgColors = ['#8A2BE2', '#4B0082']; // Purple to Indigo
                 headerColor = '#4B0082';
                 titleColor = '#00FFFF'; // Cyan text
