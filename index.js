@@ -739,7 +739,7 @@ Return a valid JSON object ONLY:
             let titleColor = '#ffffff';
             let subtitleColor = '#075AAA';
 
-            let isOwner = targetUser.id === '797310456951210034';
+
 
             switch (currentRank) {
                 case "Cadet":
@@ -771,13 +771,7 @@ Return a valid JSON object ONLY:
                     break;
             }
 
-            if (isOwner) {
-                currentRank = "Founder";
-                bgColors = ['#1c1c1c', '#000000']; // Matte Carbon Black
-                headerColor = '#000000';
-                titleColor = '#d4af37'; // Champagne Gold
-                subtitleColor = '#d4af37';
-            }
+
 
             const gradient = ctx.createLinearGradient(0, 0, 800, 400);
             gradient.addColorStop(0, bgColors[0]);
