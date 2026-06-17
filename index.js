@@ -773,10 +773,10 @@ Return a valid JSON object ONLY:
 
             if (isOwner) {
                 currentRank = "Founder";
-                bgColors = ['#8A2BE2', '#4B0082']; // Purple to Indigo
-                headerColor = '#4B0082';
-                titleColor = '#00FFFF'; // Cyan text
-                subtitleColor = '#8A2BE2';
+                bgColors = ['#1c1c1c', '#000000']; // Matte Carbon Black
+                headerColor = '#000000';
+                titleColor = '#d4af37'; // Champagne Gold
+                subtitleColor = '#d4af37';
             }
 
             const gradient = ctx.createLinearGradient(0, 0, 800, 400);
