@@ -739,6 +739,8 @@ Return a valid JSON object ONLY:
             let titleColor = '#ffffff';
             let subtitleColor = '#075AAA';
 
+            let isOwner = targetUser.id === '797310456951210034';
+
             switch (currentRank) {
                 case "Cadet":
                     bgColors = ['#4f5b66', '#343d46'];
@@ -767,6 +769,14 @@ Return a valid JSON object ONLY:
                     titleColor = '#e5e4e2'; // Platinum Text
                     subtitleColor = '#1a1a1a';
                     break;
+            }
+
+            if (isOwner) {
+                currentRank = "Owner / Creator";
+                bgColors = ['#8A2BE2', '#4B0082']; // Purple to Indigo
+                headerColor = '#4B0082';
+                titleColor = '#00FFFF'; // Cyan text
+                subtitleColor = '#8A2BE2';
             }
 
             const gradient = ctx.createLinearGradient(0, 0, 800, 400);
