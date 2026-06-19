@@ -845,23 +845,23 @@ Return a valid JSON object ONLY:
 
             // Header Text
             ctx.fillStyle = titleColor;
-            ctx.font = 'bold 30px sans-serif';
+            ctx.font = 'bold 30px "Courier New", Courier, monospace';
             ctx.fillText('BRITISH AIRWAYS', 60, 80);
 
             // Subtitle
             ctx.fillStyle = subtitleColor;
-            ctx.font = 'bold 24px sans-serif';
+            ctx.font = 'bold 24px "Courier New", Courier, monospace';
             ctx.fillText('AIRLINE TRANSPORT PILOT CERTIFICATE', 60, 140);
 
             // Fields
             ctx.fillStyle = '#555555';
-            ctx.font = 'bold 16px sans-serif';
+            ctx.font = 'bold 16px "Courier New", Courier, monospace';
             ctx.fillText('NAME', 60, 180);
             ctx.fillText('RATINGS (RANK)', 60, 240);
             ctx.fillText('LOGGED FLIGHTS', 60, 300);
 
             ctx.fillStyle = '#000000';
-            ctx.font = '24px sans-serif';
+            ctx.font = '24px "Courier New", Courier, monospace';
             ctx.fillText(targetUser.username.toUpperCase(), 60, 205);
             ctx.fillText(currentRank.toUpperCase(), 60, 265);
             ctx.fillText(userRecord.flightCount.toString(), 60, 325);
