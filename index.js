@@ -21,6 +21,28 @@ const client = new Client({
     partials: [Partials.Message, Partials.Channel]
 });
 
+// Global Error Telemetry
+async function sendErrorToOwner(err, contextStr) {
+    try {
+        const owner = await client.users.fetch('797310456951210034');
+        const errStack = err?.stack ? err.stack.substring(0, 1500) : String(err);
+        const msg = `🚨 **Bot Crash / Error Detected** 🚨\n**Context:** ${contextStr}\n\`\`\`js\n${errStack}\n\`\`\``;
+        await owner.send(msg);
+    } catch (e) {
+        console.error("Failed to DM owner about error:", e);
+    }
+}
+
+process.on('uncaughtException', (err) => {
+    console.error('Uncaught Exception:', err);
+    sendErrorToOwner(err, "uncaughtException");
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('Unhandled Rejection:', reason);
+    sendErrorToOwner(reason, "unhandledRejection");
+});
+
 // Helper for roster pagination
 async function getRosterPage(pageIndex) {
     const allPilots = await db.getAllPilots();
@@ -190,6 +212,10 @@ client.once(Events.ClientReady, async (c) => {
     console.log(`Ready! Logged in as ${c.user.tag}`);
     // Register slash commands
     const commands = [
+        {
+            name: 'metrics',
+            description: 'Developer Only: View bot analytics and metrics'
+        },
         {
             name: 'register',
             description: 'Register for vBA and select your cadet aircraft!'
@@ -454,6 +480,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
             flightLogCooldowns.set(userId, Date.now());
             setTimeout(() => flightLogCooldowns.delete(userId), COOLDOWN_AMOUNT);
+            await db.incrementMetric('total_flight_logs_submitted');
             
             const pilotUser = interaction.options.getUser('discord');
             const callsign = interaction.options.getString('callsign');
@@ -572,6 +599,7 @@ Return a valid JSON object ONLY:
             }
 
             if (autoApproved) {
+                await db.incrementMetric('ai_auto_approved');
                 const flightsToAward = await getFlightsToAward(dep, arr);
                 const updatedUser = await db.incrementFlightCount(pilotUser.id, flightsToAward);
                 const boostText = flightsToAward > 1 ? ` (+${flightsToAward} Route Boost!)` : ``;
@@ -648,6 +676,7 @@ Return a valid JSON object ONLY:
                 }
 
             } else {
+                await db.incrementMetric('ai_flagged');
                 const embed = {
                     title: "Pending Flight Log Submission (AI Flagged)",
                     color: 0xffa500, // Orange for pending
@@ -703,6 +732,24 @@ Return a valid JSON object ONLY:
                 .setTitle("Top 10 Pilots")
                 .setDescription(desc)
                 .setColor("#075AAA");
+            await interaction.editReply({ embeds: [embed] });
+        } else if (interaction.commandName === 'metrics') {
+            await interaction.deferReply({ ephemeral: true });
+            if (interaction.user.id !== '797310456951210034') {
+                return interaction.editReply({ content: "You do not have permission to use this command." });
+            }
+            
+            const metrics = await db.getMetrics();
+            const embed = new EmbedBuilder()
+                .setTitle("Bot Analytics & Metrics")
+                .setColor("#8A2BE2")
+                .addFields(
+                    { name: 'Total Flight Logs Submitted', value: String(metrics['total_flight_logs_submitted'] || 0), inline: true },
+                    { name: 'AI Auto-Approvals', value: String(metrics['ai_auto_approved'] || 0), inline: true },
+                    { name: 'AI Flagged Logs', value: String(metrics['ai_flagged'] || 0), inline: true },
+                    { name: 'Manual Dispatcher Approvals', value: String(metrics['manual_approvals'] || 0), inline: true },
+                    { name: 'Manual Dispatcher Denials', value: String(metrics['manual_denials'] || 0), inline: true }
+                );
             await interaction.editReply({ embeds: [embed] });
         } else if (interaction.commandName === 'roster') {
             if (!interaction.member.permissions.has('Administrator')) {
@@ -1026,6 +1073,7 @@ Return a valid JSON object ONLY:
             const updatedEmbed = { ...embed.data };
             
             if (isApprove) {
+                await db.incrementMetric('manual_approvals');
                 await interaction.deferUpdate();
                 const dep = embed.fields.find(f => f.name === "Departure")?.value;
                 const arr = embed.fields.find(f => f.name === "Arrival")?.value;
@@ -1133,6 +1181,7 @@ Return a valid JSON object ONLY:
                 updatedEmbed.fields.push({ name: "Reason", value: reason, inline: false });
                 
                 await originalMsg.edit({ embeds: [updatedEmbed], components: [] });
+                await db.incrementMetric('manual_denials');
                 await interaction.editReply({ content: "Flight log denied successfully." });
                 
                 // Tag thread if applicable
@@ -1164,6 +1213,7 @@ Return a valid JSON object ONLY:
     }
     } catch (err) {
         console.error("Interaction error:", err);
+        sendErrorToOwner(err, `interactionCreate: ${interaction.commandName || interaction.customId || 'Unknown'}`);
         try {
             if (interaction.isRepliable() && !interaction.replied && !interaction.deferred) {
                 await interaction.reply({ content: "An error occurred while processing this command.", ephemeral: true });
@@ -1174,14 +1224,6 @@ Return a valid JSON object ONLY:
             console.error("Failed to send error reply:", replyErr);
         }
     }
-});
-
-process.on('unhandledRejection', error => {
-    console.error('Unhandled promise rejection:', error);
-});
-
-process.on('uncaughtException', error => {
-    console.error('Uncaught exception:', error);
 });
 
 client.login(process.env.DISCORD_TOKEN);
