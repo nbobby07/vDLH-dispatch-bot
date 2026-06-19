@@ -1073,8 +1073,8 @@ Return a valid JSON object ONLY:
             const updatedEmbed = { ...embed.data };
             
             if (isApprove) {
-                await db.incrementMetric('manual_approvals');
                 await interaction.deferUpdate();
+                await db.incrementMetric('manual_approvals');
                 const dep = embed.fields.find(f => f.name === "Departure")?.value;
                 const arr = embed.fields.find(f => f.name === "Arrival")?.value;
                 const flightsToAward = await getFlightsToAward(dep, arr);
