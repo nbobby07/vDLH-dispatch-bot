@@ -528,9 +528,9 @@ Rules for Approval:
 4. Callsign: The callsign on screen can have extra characters, dashes, or missing digits compared to the submission (e.g., expected BAW7 but got BAW7393, or SHT21B vs SHT-21B). Allow fuzzy matching.
 5. Callsign Route Rules: The callsign prefix MUST match the route type:
    - SHT: Between 2 UK airports (e.g., EGLL, EGGD, EGCC, EGHI, EGLC).
-   - CFE: International flight out of EGLC.
+   - CFE: International flight departing from or arriving at EGLC.
    - EFW: International flight out of EGGD.
-   - BAW: International flight out of EGLL (or EGCC / general international).
+   - BAW: International flight departing from or arriving at EGLL.
 
 Return a valid JSON object ONLY:
 {
