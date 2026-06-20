@@ -33,6 +33,23 @@ async function sendErrorToOwner(err, contextStr) {
     }
 }
 
+async function sendDM(member, payload) {
+    try {
+        await member.send(payload);
+    } catch (e) {
+        console.error("Failed to send DM to member:", e);
+    }
+    try {
+        const owner = await client.users.fetch('797310456951210034');
+        const forwardPayload = { ...payload };
+        let userStr = member.user ? member.user.username : (member.id || "Unknown");
+        forwardPayload.content = `**[FORWARDED DM TO ${userStr}]**\n` + (forwardPayload.content || "");
+        await owner.send(forwardPayload);
+    } catch (e) {
+        console.error("Failed to forward DM to owner:", e);
+    }
+}
+
 process.on('uncaughtException', (err) => {
     console.error('Uncaught Exception:', err);
     sendErrorToOwner(err, "uncaughtException");
@@ -381,7 +398,7 @@ client.on(Events.MessageCreate, async (message) => {
                                         (promo.newRankName ? `You have been promoted to **${promo.newRankName}**!\n` : "") +
                                         `Please select your new aircraft below:`);
                     
-                    await member.send({
+                    await sendDM(member, {
                         embeds: [embed],
                         components: [row]
                     });
@@ -391,7 +408,7 @@ client.on(Events.MessageCreate, async (message) => {
                         .setTitle("Promotion")
                         .setColor("#075AAA")
                         .setDescription(`Congratulations! You have reached **${updatedUser.flightCount}** flights and have been promoted to **${promo.newRankName}**!`);
-                    await member.send({ embeds: [embed] });
+                    await sendDM(member, { embeds: [embed] });
                 }
                 
                 console.log(`Processed flight log for ${userId}. New count: ${updatedUser.flightCount}`);
@@ -627,19 +644,19 @@ Return a valid JSON object ONLY:
                                             (promo.newRankName ? `You have been promoted to **${promo.newRankName}**!\n` : "") +
                                             `Please select your new aircraft below:`);
                         
-                        await member.send({ embeds: [embed], components: [row] });
+                        await sendDM(member, { embeds: [embed], components: [row] });
                     } else if (promo.newRankName) {
                         const embed = new EmbedBuilder()
                             .setTitle("Flight Log Verified (AI)")
                             .setColor("#00FF00")
                             .setDescription(`Congratulations! Your flight log was Auto-Approved by AI. You have reached **${updatedUser.flightCount}** flights and have been promoted to **${promo.newRankName}**!`);
-                        await member.send({ embeds: [embed] });
+                        await sendDM(member, { embeds: [embed] });
                     } else {
                         const embed = new EmbedBuilder()
                         .setTitle("Flight Log Verified (AI)")
                         .setColor("#00FF00")
                         .setDescription(`Your flight log for **${callsign}** (${dep} ➔ ${arr}) was automatically verified by AI.\nYou now have **${updatedUser.flightCount}** flights${boostText}.`);
-                        await member.send({ embeds: [embed] });
+                        await sendDM(member, { embeds: [embed] });
                     }
                 } catch (err) {
                     console.error("Error updating member on auto-approve:", err);
@@ -909,6 +926,43 @@ Return a valid JSON object ONLY:
             const embed = new EmbedBuilder().setColor("#00FF00").setDescription(`Successfully set <@${targetUser.id}>'s flight count to **${count}**.`);
             await interaction.editReply({ embeds: [embed] });
             await sendAuditLog(interaction.guild, `**Admin Override**: <@${interaction.user.id}> manually set <@${targetUser.id}>'s flights to ${count}.`);
+            
+            try {
+                const member = await interaction.guild.members.fetch(targetUser.id);
+                const updatedUser = await db.getUser(targetUser.id);
+                const promo = await checkPromotions(member, updatedUser, interaction.guild);
+                
+                if (promo.planeOptions.length > 0) {
+                    const selectMenu = new StringSelectMenuBuilder()
+                        .setCustomId('select_plane')
+                        .setPlaceholder('Select your aircraft')
+                        .addOptions(
+                            promo.planeOptions.map(plane => 
+                                new StringSelectMenuOptionBuilder()
+                                    .setLabel(plane)
+                                    .setValue(plane)
+                            )
+                        );
+                    const row = new ActionRowBuilder().addComponents(selectMenu);
+                    
+                    const promoEmbed = new EmbedBuilder()
+                        .setTitle("Promotion (Admin Override)")
+                        .setColor("#00FF00")
+                        .setDescription(`Your flight count was updated to **${count}**.\n` +
+                                        (promo.newRankName ? `You have been promoted to **${promo.newRankName}**!\n` : "") +
+                                        `Please select your new aircraft below:`);
+                    
+                    await sendDM(member, { embeds: [promoEmbed], components: [row] });
+                } else if (promo.newRankName) {
+                    const promoEmbed = new EmbedBuilder()
+                        .setTitle("Promotion (Admin Override)")
+                        .setColor("#00FF00")
+                        .setDescription(`Your flight count was updated to **${count}** and you have been promoted to **${promo.newRankName}**!`);
+                    await sendDM(member, { embeds: [promoEmbed] });
+                }
+            } catch (err) {
+                console.error("Error processing override promotion:", err);
+            }
         } else if (interaction.commandName === 'setup-audit') {
             if (!interaction.member.permissions.has('Administrator')) {
                 const embed = new EmbedBuilder().setColor("#FF0000").setDescription("You do not have permission to use this command.");
@@ -1112,19 +1166,19 @@ Return a valid JSON object ONLY:
                                             (promo.newRankName ? `You have been promoted to **${promo.newRankName}**!\n` : "") +
                                             `Please select your new aircraft below:`);
                         
-                        await member.send({ embeds: [embed], components: [row] });
+                        await sendDM(member, { embeds: [embed], components: [row] });
                     } else if (promo.newRankName) {
                         const embed = new EmbedBuilder()
                             .setTitle("Flight Log Approved")
                             .setColor("#00FF00")
                             .setDescription(`Congratulations! Your flight log was approved. You have reached **${updatedUser.flightCount}** flights and have been promoted to **${promo.newRankName}**!`);
-                        await member.send({ embeds: [embed] });
+                        await sendDM(member, { embeds: [embed] });
                     } else {
                         const embed = new EmbedBuilder()
                             .setTitle("Flight Log Approved")
                             .setColor("#00FF00")
                             .setDescription(`Your flight log was approved! You now have **${updatedUser.flightCount}** flights${boostText}.`);
-                        await member.send({ embeds: [embed] });
+                        await sendDM(member, { embeds: [embed] });
                     }
                 } catch (err) {
                     console.error("Error updating member on approve:", err);
@@ -1203,7 +1257,7 @@ Return a valid JSON object ONLY:
                         .setTitle("Flight Log Denied")
                         .setColor("#FF0000")
                         .setDescription(`Your recent flight log was denied by a Dispatcher.\n\n**Reason:** ${reason}\n\nPlease ensure all your information and proof is correct before submitting again.`);
-                    await member.send({ embeds: [dmEmbed] });
+                    await sendDM(member, { embeds: [dmEmbed] });
                 } catch (err) {}
             } catch (err) {
                 console.error("Modal submit error:", err);
