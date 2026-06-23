@@ -8,6 +8,7 @@ const fs = require('fs');
 
 
 const flightLogCooldowns = new Map();
+const processingFlights = new Set();
 const ai = new GoogleGenAI({
     apiKey: process.env.GEMINI_API_KEY
 });
@@ -1183,6 +1184,10 @@ Return a valid JSON object ONLY:
             const updatedEmbed = { ...embed.data };
             
             if (isApprove) {
+                if (processingFlights.has(interaction.message.id)) {
+                    return interaction.reply({ content: "Someone else is already processing this flight log!", ephemeral: true });
+                }
+                processingFlights.add(interaction.message.id);
                 await interaction.deferUpdate();
                 await db.incrementMetric('manual_approvals');
                 
@@ -1329,10 +1334,14 @@ Return a valid JSON object ONLY:
 
 
         if (interaction.customId.startsWith('deny_reason_modal_')) {
-            await interaction.deferReply({ ephemeral: true });
             const parts = interaction.customId.split('_');
-            const pilotId = parts[3];
             const msgId = parts[4];
+            if (processingFlights.has(msgId)) {
+                return interaction.reply({ content: "Someone else is already processing this flight log!", ephemeral: true });
+            }
+            processingFlights.add(msgId);
+            await interaction.deferReply({ ephemeral: true });
+            const pilotId = parts[3];
             
             const reason = interaction.fields.getTextInputValue('deny_reason_input');
             
