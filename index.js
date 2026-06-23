@@ -244,7 +244,7 @@ client.once(Events.ClientReady, async (c) => {
             name: 'land',
             description: 'Log your arrival and attach your proof',
             options: [
-                { name: 'flight_time', description: 'Actual Flight Time (e.g. 1h 15m)', type: 3, required: true },
+
                 { name: 'proof', description: 'Screenshot of the flight summary', type: 11, required: true }
             ]
         },
@@ -498,7 +498,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
         } else if (interaction.commandName === 'land') {
             await interaction.deferReply({ ephemeral: false }); // Needs to be visible maybe? Or ephemeral. Let's do ephemeral so it doesn't clog.
             
-            const flightTime = interaction.options.getString('flight_time');
+
             const proof = interaction.options.getAttachment('proof');
             const pilotUser = interaction.user;
 
@@ -679,7 +679,7 @@ Return a valid JSON object ONLY:
                 const updatedEmbed = EmbedBuilder.from(originalMsg.embeds[0])
                     .setColor('#00FF00') // Green for arrived
                     .spliceFields(4, 1, { name: 'Status', value: '🛬 Arrived (Verified)', inline: true })
-                    .addFields({ name: 'Flight Time', value: flightTime, inline: true });
+                    
                 
                 await originalMsg.edit({ embeds: [updatedEmbed], components: [] });
                 
@@ -696,7 +696,7 @@ Return a valid JSON object ONLY:
                                 { name: "Callsign", value: callsign, inline: true },
                                 { name: "Aircraft", value: aircraft, inline: true },
                                 { name: "Route", value: route, inline: true },
-                                { name: "Flight Time", value: flightTime, inline: true },
+                                
                                 { name: "AI Reasoning", value: aiReasoning, inline: false }
                             ],
                             image: { url: proofUrl },
@@ -717,7 +717,7 @@ Return a valid JSON object ONLY:
                     .setColor('#FFA500') // Orange for pending dispatcher
                     .spliceFields(4, 1, { name: 'Status', value: '🛬 Arrived (Pending Dispatcher)', inline: true })
                     .addFields(
-                        { name: 'Flight Time', value: flightTime, inline: true },
+                        
                         { name: 'AI Check', value: aiReasoning, inline: false }
                     );
 
