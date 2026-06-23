@@ -4,7 +4,7 @@ module.exports = {
 
     // Discord Channel/Category configurations
     LOGS_CHANNEL_ID: '1506743218354524251',
-    LIVE_FLIGHTS_CHANNEL_ID: 'REPLACE_ME_LIVE_FLIGHTS',
+    LIVE_FLIGHTS_CHANNEL_ID: '1519081183286132857',
     DISPATCHER_ROLE_ID: '1506356705175404726',
 
     // Define the promotion tiers and the planes unlocked at each step
@@ -12,28 +12,28 @@ module.exports = {
         {
             flightsRequired: 0,
             rankName: "Second Officer",
-            rankRoleId: "ROLE_ID_SO",
+            rankRoleId: "1506356938823303178",
             unlocks: ["E190", "A320neo"],
             canPick: 2
         },
         {
             flightsRequired: 15,
             rankName: "First Officer",
-            rankRoleId: "ROLE_ID_FO",
+            rankRoleId: "1506356891800961137",
             unlocks: [], // Just route unlocks, handled by ATC/Pilots
             canPick: 0
         },
         {
             flightsRequired: 35,
             rankName: "Senior First Officer",
-            rankRoleId: "ROLE_ID_SFO",
+            rankRoleId: "1506356832988303460",
             unlocks: ["B787"],
             canPick: 1
         },
         {
             flightsRequired: 75,
             rankName: "Captain",
-            rankRoleId: "ROLE_ID_CPT",
+            rankRoleId: "1506356784435040306",
             unlocks: ["B747-8", "A380", "B777F"],
             canPick: 3
         }
@@ -41,11 +41,11 @@ module.exports = {
 
     // Map each plane name to its corresponding Discord Role ID
     PLANE_ROLES: {
-        "E190": "ROLE_ID_E190",
-        "A320neo": "ROLE_ID_A320neo",
-        "B787": "ROLE_ID_B787",
-        "B747-8": "ROLE_ID_B747_8",
-        "A380": "ROLE_ID_A380",
-        "B777F": "ROLE_ID_B777F"
+        "E190": "1507311793175924776",
+        "A320neo": "1507311824427814932",
+        "B787": "1507311916144394270",
+        "B747-8": "1507312037720752190",
+        "A380": "1507312009669120101",
+        "B777F": "1507311947362730085"
     }
 };
