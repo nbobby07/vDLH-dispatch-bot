@@ -675,13 +675,9 @@ Return a valid JSON object ONLY:
                     console.error("Error updating member on auto-approve:", err);
                 }
 
-                // Update the original live flights embed to Arrived
-                const updatedEmbed = EmbedBuilder.from(originalMsg.embeds[0])
-                    .setColor('#00FF00') // Green for arrived
-                    .spliceFields(4, 1, { name: 'Status', value: '🛬 Arrived (Verified)', inline: true })
-                    
-                
-                await originalMsg.edit({ embeds: [updatedEmbed], components: [] });
+
+                // Delete the original message from live flights
+                try { await originalMsg.delete(); } catch(e) { console.error("Failed to delete live flight msg", e); }
                 
                 let logsChannelId = await db.getSetting('LOG_CHANNEL_ID');
                 if (!logsChannelId) logsChannelId = config.LOGS_CHANNEL_ID;
@@ -689,38 +685,45 @@ Return a valid JSON object ONLY:
                     try {
                         const logsChannel = await interaction.guild.channels.fetch(logsChannelId);
                         const embedFinal = {
-                            title: "Flight Log Auto-Approved (AI)",
+                            title: "Flight Log Verified (AI)",
                             color: 0x00ff00,
                             fields: [
                                 { name: "Pilot", value: `<@${pilotUser.id}>`, inline: true },
                                 { name: "Callsign", value: callsign, inline: true },
                                 { name: "Aircraft", value: aircraft, inline: true },
                                 { name: "Route", value: route, inline: true },
-                                
+                                { name: "Status", value: '🛬 Arrived (Verified)', inline: true },
                                 { name: "AI Reasoning", value: aiReasoning, inline: false }
                             ],
                             image: { url: proofUrl },
                             footer: { text: `User ID: ${pilotUser.id}` }
                         };
-                        await logsChannel.send({ embeds: [embedFinal] });
+                        
+                        let tags = [];
+                        if (logsChannel.availableTags) {
+                            const approvedTag = logsChannel.availableTags.find(t => t.name.toLowerCase() === 'approved');
+                            if (approvedTag) tags.push(approvedTag.id);
+                        }
+                        
+                        const pilotDisplayName = interaction.member ? interaction.member.displayName : pilotUser.username;
+                        
+                        await logsChannel.threads.create({
+                            name: `${callsign} - ${pilotDisplayName}`,
+                            message: { embeds: [embedFinal] },
+                            appliedTags: tags
+                        });
                     } catch (e) {
-                        console.error("Failed to post to logs channel:", e);
+                        console.error("Failed to post to forum channel:", e);
                     }
                 }
 
-                await interaction.editReply({ content: "Flight successfully logged and verified by AI!" });
+                await interaction.editReply({ content: "✅ Flight successfully landed and verified by AI! Check <#" + logsChannelId + "> for your record." });
             } else {
                 await db.incrementMetric('ai_flagged');
                 
-                // Update the original live flights embed to Flagged
-                const updatedEmbed = EmbedBuilder.from(originalMsg.embeds[0])
-                    .setColor('#FFA500') // Orange for pending dispatcher
-                    .spliceFields(4, 1, { name: 'Status', value: '🛬 Arrived (Pending Dispatcher)', inline: true })
-                    .addFields(
-                        
-                        { name: 'AI Check', value: aiReasoning, inline: false }
-                    );
-
+                // Delete the original message from live flights
+                try { await originalMsg.delete(); } catch(e) { console.error("Failed to delete live flight msg", e); }
+                
                 const approveBtn = new ButtonBuilder()
                     .setCustomId(`approve_flight_${pilotUser.id}`)
                     .setLabel("Approve")
@@ -733,8 +736,49 @@ Return a valid JSON object ONLY:
 
                 const row = new ActionRowBuilder().addComponents(approveBtn, denyBtn);
                 
-                await originalMsg.edit({ embeds: [updatedEmbed], components: [row] });
-                await interaction.editReply({ content: "Flight landed, but AI flagged the proof for Dispatcher review." });
+                let logsChannelId = await db.getSetting('LOG_CHANNEL_ID');
+                if (!logsChannelId) logsChannelId = config.LOGS_CHANNEL_ID;
+                if (logsChannelId) {
+                    try {
+                        const logsChannel = await interaction.guild.channels.fetch(logsChannelId);
+                        const embedFinal = {
+                            title: "Pending Dispatcher Review",
+                            color: 0xffa500, // Orange
+                            fields: [
+                                { name: "Pilot", value: `<@${pilotUser.id}>`, inline: true },
+                                { name: "Callsign", value: callsign, inline: true },
+                                { name: "Aircraft", value: aircraft, inline: true },
+                                { name: "Route", value: route, inline: true },
+                                { name: "Status", value: '🛬 Arrived (Pending Dispatcher)', inline: true },
+                                { name: "AI Check", value: aiReasoning, inline: false }
+                            ],
+                            image: { url: proofUrl },
+                            footer: { text: `User ID: ${pilotUser.id}` }
+                        };
+                        
+                        let tags = [];
+                        if (logsChannel.availableTags) {
+                            const pendingTag = logsChannel.availableTags.find(t => t.name.toLowerCase() === 'pending');
+                            if (pendingTag) tags.push(pendingTag.id);
+                        }
+                        
+                        const pilotDisplayName = interaction.member ? interaction.member.displayName : pilotUser.username;
+                        
+                        await logsChannel.threads.create({
+                            name: `${callsign} - ${pilotDisplayName}`,
+                            message: { 
+                                content: `<@&${config.DISPATCHER_ROLE_ID}>`,
+                                embeds: [embedFinal],
+                                components: [row]
+                            },
+                            appliedTags: tags
+                        });
+                    } catch (e) {
+                        console.error("Failed to post to forum channel:", e);
+                    }
+                }
+                
+                await interaction.editReply({ content: "Flight landed, but AI flagged the proof. It has been sent to Dispatch for manual review." });
             }
         } else if (interaction.commandName === 'leaderboard') {
             await interaction.deferReply();
@@ -1216,6 +1260,8 @@ Return a valid JSON object ONLY:
                         const approvedTag = parentChannel.availableTags.find(t => t.name.toLowerCase() === 'approved');
                         if (approvedTag) {
                             const newTags = new Set(interaction.channel.appliedTags);
+                            const pendingTag = parentChannel.availableTags.find(t => t.name.toLowerCase() === 'pending');
+                            if (pendingTag) newTags.delete(pendingTag.id);
                             newTags.add(approvedTag.id);
                             await interaction.channel.setAppliedTags(Array.from(newTags));
                         }
@@ -1316,6 +1362,8 @@ Return a valid JSON object ONLY:
                         const deniedTag = parentChannel.availableTags.find(t => t.name.toLowerCase() === 'denied');
                         if (deniedTag) {
                             const newTags = new Set(interaction.channel.appliedTags);
+                            const pendingTag = parentChannel.availableTags.find(t => t.name.toLowerCase() === 'pending');
+                            if (pendingTag) newTags.delete(pendingTag.id);
                             newTags.add(deniedTag.id);
                             await interaction.channel.setAppliedTags(Array.from(newTags));
                         }
