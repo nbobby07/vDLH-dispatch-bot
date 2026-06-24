@@ -582,7 +582,7 @@ Rules for Approval:
    *HINT*: In the flight info panel on the screenshot, the airport on the LEFT is the Departure, and the airport on the RIGHT is the Arrival. Do not swap them.
    *CRITICAL*: The screenshot uses custom in-game airport codes. You MUST map them to real-world ICAO codes before comparing:
    - IRFD -> EDDF
-   - IMLR -> EDDH
+   - IMLR -> EDDW
    - ISOU -> LFPG
    - IKFL -> EGLL
    - IIZO -> LIRF
@@ -1228,7 +1228,7 @@ Rules for Approval:
    *HINT*: In the flight info panel on the screenshot, the airport on the LEFT is the Departure, and the airport on the RIGHT is the Arrival. Do not swap them.
    *CRITICAL*: The screenshot uses custom in-game airport codes. You MUST map them to real-world ICAO codes before comparing:
    - IRFD -> EDDF
-   - IMLR -> EDDH
+   - IMLR -> EDDW
    - ISOU -> LFPG
    - IKFL -> EGLL
    - IIZO -> LIRF
