@@ -1336,11 +1336,29 @@ DISPATCHER: AUTO-DISPATCH                   PIC NAME: ${interaction.user.usernam
 
             try {
                 const dmChannel = await interaction.user.createDM();
-                await dmChannel.send("📸 **Time to land!**\n\nPlease upload your flight screenshot right here in this DM to complete your active flight (`" + callsign + "`). You have 5 minutes.");
+                const cancelBtn = new ButtonBuilder()
+                    .setCustomId('cancel_landing')
+                    .setLabel('Cancel / Continue Flying')
+                    .setStyle(ButtonStyle.Secondary);
+                const dmRow = new ActionRowBuilder().addComponents(cancelBtn);
+
+                const dmMessage = await dmChannel.send({ 
+                    content: "📸 **Time to land!**\n\nPlease upload your flight screenshot right here in this DM to complete your active flight (`" + callsign + "`). You have 5 minutes.",
+                    components: [dmRow]
+                });
+                
                 await interaction.reply({ content: "📩 Check your DMs! I've sent you a secure link to upload your proof.", ephemeral: true });
                 
                 const filter = m => m.author.id === pilotId && m.attachments.size > 0;
                 const collector = dmChannel.createMessageCollector({ filter, time: 300000, max: 1 });
+                
+                const btnCollector = dmMessage.createMessageComponentCollector({ time: 300000 });
+                btnCollector.on('collect', async i => {
+                    if (i.customId === 'cancel_landing') {
+                        collector.stop('cancelled');
+                        await i.update({ content: "Landing process cancelled! Your flight is still active. When you are actually ready to land, just click the **Land Flight** button on your flight card again.", components: [] });
+                    }
+                });
                 
                 collector.on('collect', async m => {
                     const replyMsg = await m.reply("Processing with AI... ⏳");
@@ -1588,9 +1606,10 @@ Return a valid JSON object ONLY:
                     }
                 });
 
-                collector.on('end', collected => {
+                collector.on('end', (collected, reason) => {
+                    if (reason === 'cancelled') return;
                     if (collected.size === 0) {
-                        dmChannel.send("❌ You didn't upload your screenshot within 5 minutes. If you still need to land, use the `/land` command in the bot commands channel.");
+                        dmChannel.send("❌ You didn't upload your screenshot within 5 minutes. If you still need to land, use the `/land` command in the bot commands channel, or click the **Land Flight** button on your flight card again.");
                     }
                 });
 
