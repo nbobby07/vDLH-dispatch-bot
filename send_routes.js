@@ -32,38 +32,38 @@ client.once('ready', async () => {
         const embedShort = new EmbedBuilder()
             .setTitle("SHORT-HAUL FLEET: [A320neo / ATR72]")
             .setDescription(
-                "• Frankfurt [IRFD] ↔ Munich [IPPH]\n" +
-                "• Frankfurt [IRFD] ↔ Bremen [IMLR]\n" +
-                "• Munich [IPPH] ↔ Bremen [IMLR]\n\n" +
-                "• Frankfurt [IRFD] ➔ Paris [ISOU]\n" +
-                "• Munich [IPPH] ➔ Rome [IIZO]"
+                "• Frankfurt [IRFD/EDDF] ↔ Munich [IPPH/EDDM]\n" +
+                "• Frankfurt [IRFD/EDDF] ↔ Bremen [IMLR/EDDW]\n" +
+                "• Munich [IPPH/EDDM] ↔ Bremen [IMLR/EDDW]\n\n" +
+                "• Frankfurt [IRFD/EDDF] ➔ Paris [ISAU/LFPG]\n" +
+                "• Munich [IPPH/EDDM] ➔ Rome [IZOL/LIRF]"
             )
             .setColor(lufthansaBlue);
 
         const embedMedium = new EmbedBuilder()
             .setTitle("MEDIUM-HAUL FLEET: [A350 / A330]")
             .setDescription(
-                "• Frankfurt [IRFD] ➔ Athens [ILAR]\n" +
-                "• Munich [IPPH] ➔ Athens [ILAR]\n" +
-                "• Munich [IPPH] ➔ London [IKFL]\n" +
-                "• Frankfurt [IRFD] ➔ Mallorca [IPAP]"
+                "• Frankfurt [IRFD/EDDF] ➔ Athens [ILAR/LGAV]\n" +
+                "• Munich [IPPH/EDDM] ➔ Athens [ILAR/LGAV]\n" +
+                "• Munich [IPPH/EDDM] ➔ London [IKFL/EGLL]\n" +
+                "• Frankfurt [IRFD/EDDF] ➔ Mallorca [IPAP/LEPA]"
             )
             .setColor(lufthansaBlue);
             
         const embedLong = new EmbedBuilder()
             .setTitle("HEAVY & LONG-HAUL FLEET: [B747-8 / A380]")
             .setDescription(
-                "• Frankfurt [IRFD] ➔ Tokyo [ITKO] *(Our main long haul)*\n" +
-                "• Frankfurt [IRFD] ➔ London [IKFL]\n" +
-                "• Munich [IPPH] ➔ Mallorca [IPAP]"
+                "• Frankfurt [IRFD/EDDF] ➔ Tokyo [ITKO/RJTT] *(Our main long haul)*\n" +
+                "• Frankfurt [IRFD/EDDF] ➔ London [IKFL/EGLL]\n" +
+                "• Munich [IPPH/EDDM] ➔ Mallorca [IPAP/LEPA]"
             )
             .setColor(lufthansaBlue);
             
         const embedCargo = new EmbedBuilder()
             .setTitle("LUFTHANSA CARGO: [B777F]")
             .setDescription(
-                "• Frankfurt [IRFD] ➔ London [IKFL]\n" +
-                "• Frankfurt [IRFD] ➔ Tokyo [ITKO]"
+                "• Frankfurt [IRFD/EDDF] ➔ London [IKFL/EGLL]\n" +
+                "• Frankfurt [IRFD/EDDF] ➔ Tokyo [ITKO/RJTT]"
             )
             .setColor(lufthansaYellow);
 

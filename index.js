@@ -583,9 +583,9 @@ Rules for Approval:
    *CRITICAL*: The screenshot uses custom in-game airport codes. You MUST map them to real-world ICAO codes before comparing:
    - IRFD -> EDDF
    - IMLR -> EDDW
-   - ISOU -> LFPG
+   - ISAU -> LFPG
    - IKFL -> EGLL
-   - IIZO -> LIRF
+   - IZOL -> LIRF
    - ILAR -> LGAV
    - IPAP -> LEPA
    - ITKO -> RJTT
@@ -1229,9 +1229,9 @@ Rules for Approval:
    *CRITICAL*: The screenshot uses custom in-game airport codes. You MUST map them to real-world ICAO codes before comparing:
    - IRFD -> EDDF
    - IMLR -> EDDW
-   - ISOU -> LFPG
+   - ISAU -> LFPG
    - IKFL -> EGLL
-   - IIZO -> LIRF
+   - IZOL -> LIRF
    - ILAR -> LGAV
    - IPAP -> LEPA
    - ITKO -> RJTT
