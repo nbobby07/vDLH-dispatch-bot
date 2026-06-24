@@ -63,7 +63,12 @@ client.once('ready', async () => {
             .setTitle("LUFTHANSA CARGO: [B777F]")
             .setDescription(
                 "• Frankfurt [IRFD/EDDF] ➔ London [IKFL/EGLL]\n" +
-                "• Frankfurt [IRFD/EDDF] ➔ Tokyo [ITKO/RJTT]"
+                "• Frankfurt [IRFD/EDDF] ➔ Tokyo [ITKO/RJTT]\n" +
+                "• Munich [IPPH/EDDM] ➔ Tokyo [ITKO/RJTT]\n" +
+                "• Frankfurt [IRFD/EDDF] ➔ Rome [IZOL/LIRF]\n" +
+                "• Munich [IPPH/EDDM] ➔ Rome [IZOL/LIRF]\n" +
+                "• Frankfurt [IRFD/EDDF] ➔ Athens [ILAR/LGAV]\n" +
+                "• Munich [IPPH/EDDM] ➔ Athens [ILAR/LGAV]"
             )
             .setColor(lufthansaYellow);
 
