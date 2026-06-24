@@ -461,16 +461,32 @@ client.on(Events.InteractionCreate, async (interaction) => {
                 components: [row]
             });
         } else if (interaction.commandName === 'dispatch') {
+            const userRecord = await db.getUser(interaction.user.id);
+            if (!userRecord || userRecord.unlockedPlanes.length === 0) {
+                return interaction.reply({ content: "You haven't unlocked any aircraft yet! Please use /register to get started.", ephemeral: true });
+            }
+            
+            const planes = userRecord.unlockedPlanes;
+            const canShort = planes.includes('A320neo') || planes.includes('ATR72') || planes.includes('E190');
+            const canMedium = planes.includes('A350') || planes.includes('A330');
+            const canLong = planes.includes('B747-8') || planes.includes('A380');
+            const canCargo = planes.includes('B777F');
+
+            const options = [];
+            if (canShort) options.push({ label: 'Short Haul', description: 'Regional and domestic routes', value: 'Short Haul' });
+            if (canMedium) options.push({ label: 'Medium Haul', description: 'Continental and medium-range routes', value: 'Medium Haul' });
+            if (canLong) options.push({ label: 'Long Haul', description: 'Intercontinental routes', value: 'Long Haul' });
+            if (canCargo) options.push({ label: 'Cargo', description: 'Lufthansa Cargo operations', value: 'Cargo' });
+
+            if (options.length === 0) {
+                return interaction.reply({ content: "Your unlocked planes don't match any known haul types.", ephemeral: true });
+            }
+
             const row = new ActionRowBuilder().addComponents(
                 new StringSelectMenuBuilder()
                     .setCustomId('dispatch_haul_type')
                     .setPlaceholder('Select Flight Type')
-                    .addOptions(
-                        { label: 'Short Haul', description: 'Regional and domestic routes', value: 'Short Haul' },
-                        { label: 'Medium Haul', description: 'Continental and medium-range routes', value: 'Medium Haul' },
-                        { label: 'Long Haul', description: 'Intercontinental routes', value: 'Long Haul' },
-                        { label: 'Cargo', description: 'Lufthansa Cargo operations', value: 'Cargo' }
-                    )
+                    .addOptions(options)
             );
 
             await interaction.reply({
