@@ -189,6 +189,16 @@ async function checkPromotions(member, userRecord, guild) {
             
             if (tier.flightsRequired > 0) { // Don't announce cadet rank
                 await sendAuditLog(guild, `**Promotion**: <@${member.id}> has been promoted to **${tier.rankName}**! (Flights: ${userRecord.flightCount})`);
+                try {
+                    const announceChannel = await guild.channels.fetch('1506970840296722453');
+                    if (announceChannel) {
+                        const embed = new EmbedBuilder()
+                            .setTitle("🎉 Rank Promotion!")
+                            .setDescription(`Please congratulate <@${member.id}> for reaching **${userRecord.flightCount} flights**! They have been promoted to **${tier.rankName}**!`)
+                            .setColor("#005C99");
+                        await announceChannel.send({ content: `<@${member.id}>`, embeds: [embed] });
+                    }
+                } catch (e) { console.error("Error sending announcement:", e); }
             }
         } else if (tier.rankRoleId !== "NO ROLE FOR THIS RANK" && !tier.rankRoleId.startsWith("ROLE_ID_") && !member.roles.cache.has(tier.rankRoleId)) {
             // Catch-up: they have the flights but are missing the role
