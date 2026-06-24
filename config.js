@@ -24,18 +24,32 @@ module.exports = {
             canPick: 0
         },
         {
-            flightsRequired: 35,
+            flightsRequired: 60,
             rankName: "Senior First Officer",
             rankRoleId: "1506356832988303460",
-            unlocks: ["A350", "A330"],
+            unlocks: ["A350", "A330", "B777F"],
+            canPick: 1
+        },
+        {
+            flightsRequired: 100,
+            rankName: "SFO Checkpoint",
+            rankRoleId: "NO ROLE FOR THIS RANK",
+            unlocks: ["A350", "A330", "B777F"],
             canPick: 2
         },
         {
-            flightsRequired: 75,
+            flightsRequired: 150,
             rankName: "Captain",
             rankRoleId: "1506356784435040306",
-            unlocks: ["B747-8", "A380", "B777F"],
-            canPick: 3
+            unlocks: ["B747-8", "A380"],
+            canPick: 1
+        },
+        {
+            flightsRequired: 200,
+            rankName: "Captain Checkpoint",
+            rankRoleId: "NO ROLE FOR THIS RANK",
+            unlocks: ["B747-8", "A380"],
+            canPick: 2
         }
     ],
 
