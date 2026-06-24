@@ -1144,11 +1144,12 @@ Return a valid JSON object ONLY:
         }
         
         if (interaction.customId === 'dispatch_haul_type') {
+            await interaction.deferUpdate();
             const haulType = interaction.values[0];
             const availableRoutes = ROUTES.filter(r => r.type === haulType);
             
             if (availableRoutes.length === 0) {
-                return interaction.update({ content: `No routes found for ${haulType}.`, components: [] });
+                return interaction.editReply({ content: `No routes found for ${haulType}.`, components: [] });
             }
             
             const row = new ActionRowBuilder().addComponents(
@@ -1162,20 +1163,21 @@ Return a valid JSON object ONLY:
                     })))
             );
             
-            await interaction.update({
+            await interaction.editReply({
                 content: `Selected **${haulType}**. Now select your operational route:`,
                 components: [row]
             });
         }
         
         if (interaction.customId === 'dispatch_route') {
+            await interaction.deferUpdate();
             const routeId = interaction.values[0];
             const route = ROUTES.find(r => r.id === routeId);
             
             // Get user's unlocked planes
             const userRecord = await db.getUser(interaction.user.id);
             if (!userRecord || userRecord.unlockedPlanes.length === 0) {
-                return interaction.update({ content: "You haven't unlocked any aircraft yet! Please register or earn promotions.", components: [] });
+                return interaction.editReply({ content: "You haven't unlocked any aircraft yet! Please register or earn promotions.", components: [] });
             }
             
             // Filter planes by Haul Type. 
@@ -1193,13 +1195,14 @@ Return a valid JSON object ONLY:
                     })))
             );
             
-            await interaction.update({
+            await interaction.editReply({
                 content: `Route **${route.departure} ➔ ${route.arrival}** selected. Choose your aircraft:`,
                 components: [row]
             });
         }
         
         if (interaction.customId.startsWith('dispatch_aircraft:')) {
+            await interaction.deferUpdate();
             const routeId = interaction.customId.split(':')[1];
             const aircraft = interaction.values[0];
             const route = ROUTES.find(r => r.id === routeId);
@@ -1216,13 +1219,14 @@ Return a valid JSON object ONLY:
                     })))
             );
             
-            await interaction.update({
+            await interaction.editReply({
                 content: `Aircraft **${aircraft}** confirmed. Select your assigned callsign for this route:`,
                 components: [row]
             });
         }
         
         if (interaction.customId.startsWith('dispatch_callsign:')) {
+            await interaction.deferUpdate();
             const parts = interaction.customId.split(':');
             const routeId = parts[1];
             const aircraft = parts[2];
@@ -1289,7 +1293,7 @@ DISPATCHER: AUTO-DISPATCH                   PIC NAME: ${interaction.user.usernam
                 await liveChannel.send({ embeds: [liveEmbed], components: [liveRow] });
             }
             
-            await interaction.update({
+            await interaction.editReply({
                 content: `✅ Your flight has been officially dispatched and recorded in <#${liveChannelId}>!`,
                 embeds: [ofpEmbed],
                 components: []
