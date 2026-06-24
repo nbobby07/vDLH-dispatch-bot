@@ -305,6 +305,10 @@ client.once(Events.ClientReady, async (c) => {
             default_member_permissions: '8' // Administrator
         },
         {
+            name: 'sync',
+            description: 'Synchronize your unlocked planes based on your current flight rank'
+        },
+        {
             name: 'roster',
             description: 'View the full airline pilot roster (Staff only)',
             default_member_permissions: '8' // Administrator
@@ -458,9 +462,79 @@ client.on(Events.InteractionCreate, async (interaction) => {
                 .setDescription("Please select your cadet aircraft to get started:");
 
             await interaction.editReply({
-                embeds: [embed],
-                components: [row]
+                content: `You have successfully registered to Lufthansa Virtual! Your starting plane is the **${basePlane}**.\n\nYou can view your profile at any time with \`/profile\`, and you can now dispatch your first flight using \`/dispatch\`. Enjoy your career with us!`,
+                ephemeral: true
             });
+        } else if (interaction.commandName === 'sync') {
+            await interaction.deferReply({ ephemeral: true });
+            const userRecord = await db.getUser(interaction.user.id);
+            if (!userRecord) {
+                return interaction.editReply({ content: "You haven't registered yet! Please use `/register` to join." });
+            }
+            
+            const flightCount = userRecord.flightCount || 0;
+            let newPlanes = ['A320neo', 'E190'];
+            
+            const oldPlanes = userRecord.unlockedPlanes || [];
+            
+            if (flightCount >= 60) {
+                if (oldPlanes.includes('A350') || oldPlanes.includes('B787')) {
+                    if (!newPlanes.includes('A350')) newPlanes.push('A350');
+                }
+                if (oldPlanes.includes('A330')) {
+                    if (!newPlanes.includes('A330')) newPlanes.push('A330');
+                }
+                if (oldPlanes.includes('B777F')) {
+                    if (!newPlanes.includes('B777F')) newPlanes.push('B777F');
+                }
+                if (!newPlanes.includes('A350') && !newPlanes.includes('A330') && !newPlanes.includes('B777F')) {
+                     newPlanes.push('A350'); 
+                }
+            }
+            
+            if (flightCount >= 100) {
+                if (!newPlanes.includes('A330') && newPlanes.includes('A350')) newPlanes.push('A330');
+                else if (!newPlanes.includes('A350')) newPlanes.push('A350');
+                else if (!newPlanes.includes('B777F')) newPlanes.push('B777F');
+            }
+            
+            if (flightCount >= 150) {
+                if (oldPlanes.includes('B747-8') || oldPlanes.includes('A380')) {
+                    if (oldPlanes.includes('B747-8')) newPlanes.push('B747-8');
+                    if (oldPlanes.includes('A380')) newPlanes.push('A380');
+                } else {
+                    newPlanes.push('B747-8');
+                }
+            }
+            
+            if (flightCount >= 200) {
+                if (!newPlanes.includes('B747-8')) newPlanes.push('B747-8');
+                if (!newPlanes.includes('A380')) newPlanes.push('A380');
+            }
+            
+            if (oldPlanes.includes('ATR72')) {
+                newPlanes.push('ATR72');
+            }
+
+            newPlanes = [...new Set(newPlanes)];
+            
+            // We use the db to run raw update since there's no native overwrite function
+            const { Pool } = require('pg');
+            const pool = new Pool({
+                connectionString: process.env.DATABASE_URL,
+                ssl: { rejectUnauthorized: false }
+            });
+            await pool.query('UPDATE users SET unlockedPlanes = $1 WHERE userId = $2', [JSON.stringify(newPlanes), interaction.user.id]);
+            await pool.end();
+            
+            // Invalidate cache
+            const dbRef = require('./db');
+            if (dbRef.usersCache) dbRef.usersCache.delete(interaction.user.id);
+            
+            return interaction.editReply({
+                content: `✅ Your fleet has been successfully synchronized to your current rank (${flightCount} logs).\n\n**Your Unlocked Planes:**\n${newPlanes.map(p => `• ${p}`).join('\n')}`
+            });
+            
         } else if (interaction.commandName === 'dispatch') {
             await interaction.deferReply({ ephemeral: true });
             
