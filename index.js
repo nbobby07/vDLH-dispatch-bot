@@ -3,6 +3,7 @@ const { Client, GatewayIntentBits, Partials, Events, StringSelectMenuBuilder, St
 const { createCanvas, loadImage, GlobalFonts } = require('@napi-rs/canvas');
 const db = require('./db');
 const config = require('./config');
+const { ROUTES } = require('./routes');
 const { GoogleGenAI } = require('@google/genai');
 const fs = require('fs');
 
@@ -238,8 +239,8 @@ client.once(Events.ClientReady, async (c) => {
             description: 'Register for vDLH and select your cadet aircraft!'
         },
         {
-            name: 'file',
-            description: 'File a new flight plan and begin your journey'
+            name: 'dispatch',
+            description: 'Book your flight and generate an Operational Flight Plan (OFP)'
         },
         {
             name: 'land',
@@ -459,43 +460,24 @@ client.on(Events.InteractionCreate, async (interaction) => {
                 embeds: [embed],
                 components: [row]
             });
-        } else if (interaction.commandName === 'file') {
-            const modal = new ModalBuilder()
-                .setCustomId('file_flight_modal')
-                .setTitle('Pre-Flight Dispatch');
-
-            const callsignInput = new TextInputBuilder()
-                .setCustomId('callsign')
-                .setLabel('Callsign (e.g., DLH123)')
-                .setStyle(TextInputStyle.Short)
-                .setRequired(true);
-
-            const aircraftInput = new TextInputBuilder()
-                .setCustomId('aircraft')
-                .setLabel('Aircraft (e.g., A320neo)')
-                .setStyle(TextInputStyle.Short)
-                .setRequired(true);
-
-            const routeInput = new TextInputBuilder()
-                .setCustomId('route')
-                .setLabel('Route (e.g., EDDF - EGLL)')
-                .setStyle(TextInputStyle.Short)
-                .setRequired(true);
-
-            const depTimeInput = new TextInputBuilder()
-                .setCustomId('depTime')
-                .setLabel('Departure Time (Zulu)')
-                .setStyle(TextInputStyle.Short)
-                .setRequired(false);
-
-            modal.addComponents(
-                new ActionRowBuilder().addComponents(callsignInput),
-                new ActionRowBuilder().addComponents(aircraftInput),
-                new ActionRowBuilder().addComponents(routeInput),
-                new ActionRowBuilder().addComponents(depTimeInput)
+        } else if (interaction.commandName === 'dispatch') {
+            const row = new ActionRowBuilder().addComponents(
+                new StringSelectMenuBuilder()
+                    .setCustomId('dispatch_haul_type')
+                    .setPlaceholder('Select Flight Type')
+                    .addOptions(
+                        { label: 'Short Haul', description: 'Regional and domestic routes', value: 'Short Haul' },
+                        { label: 'Medium Haul', description: 'Continental and medium-range routes', value: 'Medium Haul' },
+                        { label: 'Long Haul', description: 'Intercontinental routes', value: 'Long Haul' },
+                        { label: 'Cargo', description: 'Lufthansa Cargo operations', value: 'Cargo' }
+                    )
             );
 
-            await interaction.showModal(modal);
+            await interaction.reply({
+                content: 'Welcome to vDLH Dispatch. Please select your operational flight type:',
+                components: [row],
+                ephemeral: true
+            });
         } else if (interaction.commandName === 'land') {
             await interaction.deferReply({ ephemeral: false }); // Needs to be visible maybe? Or ephemeral. Let's do ephemeral so it doesn't clog.
             
@@ -848,7 +830,7 @@ Return a valid JSON object ONLY:
             const ctx = canvas.getContext('2d');
 
             let bgColors = ['#075AAA', '#032B4C'];
-            let headerColor = '#075AAA';
+            let headerColor = '#05164D';
             let titleColor = '#ffffff';
             let subtitleColor = '#075AAA';
 
@@ -912,7 +894,7 @@ Return a valid JSON object ONLY:
             // Header Text
             ctx.fillStyle = titleColor;
             ctx.font = 'bold 30px "Courier New", Courier, monospace';
-            ctx.fillText('BRITISH AIRWAYS', 60, 80);
+            ctx.fillText('LUFTHANSA', 60, 80);
 
             // Subtitle
             ctx.fillStyle = subtitleColor;
@@ -1143,6 +1125,159 @@ Return a valid JSON object ONLY:
                     components: [] 
                 });
             }
+        }
+        
+        if (interaction.customId === 'dispatch_haul_type') {
+            const haulType = interaction.values[0];
+            const availableRoutes = ROUTES.filter(r => r.type === haulType);
+            
+            if (availableRoutes.length === 0) {
+                return interaction.update({ content: `No routes found for ${haulType}.`, components: [] });
+            }
+            
+            const row = new ActionRowBuilder().addComponents(
+                new StringSelectMenuBuilder()
+                    .setCustomId('dispatch_route')
+                    .setPlaceholder('Select Route')
+                    .addOptions(availableRoutes.map(r => ({
+                        label: `${r.departure} ↔ ${r.arrival}`,
+                        description: `${r.distance}nm | ~${r.time}`,
+                        value: r.id
+                    })))
+            );
+            
+            await interaction.update({
+                content: `Selected **${haulType}**. Now select your operational route:`,
+                components: [row]
+            });
+        }
+        
+        if (interaction.customId === 'dispatch_route') {
+            const routeId = interaction.values[0];
+            const route = ROUTES.find(r => r.id === routeId);
+            
+            // Get user's unlocked planes
+            const userRecord = await db.getUser(interaction.user.id);
+            if (!userRecord || userRecord.unlockedPlanes.length === 0) {
+                return interaction.update({ content: "You haven't unlocked any aircraft yet! Please register or earn promotions.", components: [] });
+            }
+            
+            // Filter planes by Haul Type. 
+            // In a real system, you'd strictly map plane capabilities to route types. 
+            // For now, let's just let them select from their unlocked planes.
+            const validPlanes = userRecord.unlockedPlanes;
+            
+            const row = new ActionRowBuilder().addComponents(
+                new StringSelectMenuBuilder()
+                    .setCustomId(`dispatch_aircraft:${routeId}`)
+                    .setPlaceholder('Select Aircraft')
+                    .addOptions(validPlanes.map(p => ({
+                        label: p,
+                        value: p
+                    })))
+            );
+            
+            await interaction.update({
+                content: `Route **${route.departure} ➔ ${route.arrival}** selected. Choose your aircraft:`,
+                components: [row]
+            });
+        }
+        
+        if (interaction.customId.startsWith('dispatch_aircraft:')) {
+            const routeId = interaction.customId.split(':')[1];
+            const aircraft = interaction.values[0];
+            const route = ROUTES.find(r => r.id === routeId);
+            
+            const callsigns = route.callsigns || [`DLH${Math.floor(Math.random() * 900) + 100}`];
+            
+            const row = new ActionRowBuilder().addComponents(
+                new StringSelectMenuBuilder()
+                    .setCustomId(`dispatch_callsign:${routeId}:${aircraft}`)
+                    .setPlaceholder('Select Callsign')
+                    .addOptions(callsigns.map(c => ({
+                        label: c,
+                        value: c
+                    })))
+            );
+            
+            await interaction.update({
+                content: `Aircraft **${aircraft}** confirmed. Select your assigned callsign for this route:`,
+                components: [row]
+            });
+        }
+        
+        if (interaction.customId.startsWith('dispatch_callsign:')) {
+            const parts = interaction.customId.split(':');
+            const routeId = parts[1];
+            const aircraft = parts[2];
+            const callsign = interaction.values[0];
+            
+            const route = ROUTES.find(r => r.id === routeId);
+            const blockTimeStr = route.time;
+            const [hours, mins] = blockTimeStr.split(':').map(Number);
+            const blockTimeHours = hours + (mins / 60);
+            
+            // Very rough realistic fuel estimation based on aircraft size and flight time
+            let fuelPerHour = 2500; // A320 default
+            if (aircraft.includes('350') || aircraft.includes('330') || aircraft.includes('787')) fuelPerHour = 5500;
+            if (aircraft.includes('747') || aircraft.includes('380') || aircraft.includes('777')) fuelPerHour = 8000;
+            if (aircraft.includes('ATR') || aircraft.includes('E190')) fuelPerHour = 1000;
+            
+            const tripFuel = Math.round(blockTimeHours * fuelPerHour);
+            const plannedFuel = Math.round(tripFuel + (fuelPerHour * 1.5)); // + reserve
+            
+            const dateStr = new Date().toISOString().substring(0, 10).replace(/-/g, '').toUpperCase();
+            
+            const ofpText = `[ LUFTHANSA VIRTUAL OFP ]
+--------------------------------------------------------------------
+ATC C/S: ${callsign}     ROUTE: ${route.departure} - ${route.arrival}      AIRCRAFT: ${aircraft}
+DATE: ${dateStr}     RELEASE: ${new Date().toISOString().substring(11, 16)}Z         DISPATCHER: vDLH-AI
+--------------------------------------------------------------------
+PLANNED FUEL: ${plannedFuel} KG    TRIP FUEL: ${tripFuel} KG   BLOCK TIME: ${blockTimeStr}
+--------------------------------------------------------------------
+ROUTING:
+${route.routing}
+--------------------------------------------------------------------
+I HEREWITH CONFIRM THAT I HAVE PERFORMED A THOROUGH SELF BRIEFING...
+DISPATCHER: AUTO-DISPATCH                   PIC NAME: ${interaction.user.username.toUpperCase()}`;
+
+            const ofpEmbed = new EmbedBuilder()
+                .setTitle(`📝 OFP Released: ${callsign}`)
+                .setColor('#05164D')
+                .setDescription(`\`\`\`text\n${ofpText}\n\`\`\``);
+
+            // Post to Live Flights channel
+            let liveChannelId = await db.getSetting('LIVE_FLIGHTS_CHANNEL_ID');
+            if (!liveChannelId) liveChannelId = config.LIVE_FLIGHTS_CHANNEL_ID;
+            
+            if (liveChannelId && !liveChannelId.startsWith('REPLACE_')) {
+                const liveChannel = await interaction.guild.channels.fetch(liveChannelId);
+                const liveEmbed = new EmbedBuilder()
+                    .setTitle('🛫 Live Flight')
+                    .setColor('#0000FF')
+                    .addFields(
+                        { name: 'Pilot', value: `<@${interaction.user.id}>`, inline: true },
+                        { name: 'Callsign', value: callsign, inline: true },
+                        { name: 'Aircraft', value: aircraft, inline: true },
+                        { name: 'Route', value: `${route.departure} - ${route.arrival}`, inline: true },
+                        { name: 'Status', value: '🟢 En Route', inline: true }
+                    )
+                    .setTimestamp();
+    
+                const landButton = new ButtonBuilder()
+                    .setCustomId(`land_flight_${interaction.user.id}`)
+                    .setLabel('Land Flight')
+                    .setStyle(ButtonStyle.Success);
+    
+                const liveRow = new ActionRowBuilder().addComponents(landButton);
+                await liveChannel.send({ embeds: [liveEmbed], components: [liveRow] });
+            }
+            
+            await interaction.update({
+                content: `✅ Your flight has been officially dispatched and recorded in <#${liveChannelId}>!`,
+                embeds: [ofpEmbed],
+                components: []
+            });
         }
     } else if (interaction.isButton()) {
         if (interaction.customId.startsWith('land_flight_')) {
@@ -1583,44 +1718,7 @@ Return a valid JSON object ONLY:
             }
         }
     } else if (interaction.isModalSubmit()) {
-        if (interaction.customId === 'file_flight_modal') {
-            const callsign = interaction.fields.getTextInputValue('callsign');
-            const aircraft = interaction.fields.getTextInputValue('aircraft');
-            const route = interaction.fields.getTextInputValue('route');
-            const depTime = interaction.fields.getTextInputValue('depTime');
 
-            let liveChannelId = await db.getSetting('LIVE_FLIGHTS_CHANNEL_ID');
-            if (!liveChannelId) liveChannelId = config.LIVE_FLIGHTS_CHANNEL_ID;
-            
-            if (!liveChannelId || liveChannelId.startsWith('REPLACE_')) {
-                return interaction.reply({ content: 'LIVE_FLIGHTS_CHANNEL_ID is not configured.', ephemeral: true });
-            }
-            
-            const liveChannel = await interaction.guild.channels.fetch(liveChannelId);
-
-            const embed = new EmbedBuilder()
-                .setTitle('🛫 Live Flight')
-                .setColor('#0000FF') // Blue
-                .addFields(
-                    { name: 'Pilot', value: `<@${interaction.user.id}>`, inline: true },
-                    { name: 'Callsign', value: callsign, inline: true },
-                    { name: 'Aircraft', value: aircraft, inline: true },
-                    { name: 'Route', value: route, inline: true },
-                    { name: 'Status', value: '🟢 En Route', inline: true }
-                )
-                .setFooter({ text: `Departure: ${depTime || 'N/A'}` })
-                .setTimestamp();
-
-            const landButton = new ButtonBuilder()
-                .setCustomId(`land_flight_${interaction.user.id}`)
-                .setLabel('Land Flight')
-                .setStyle(ButtonStyle.Success);
-
-            const row = new ActionRowBuilder().addComponents(landButton);
-
-            await liveChannel.send({ embeds: [embed], components: [row] });
-            return interaction.reply({ content: `Your flight plan has been filed in <#${liveChannelId}>!`, ephemeral: true });
-        }
 
 
 
