@@ -31,35 +31,27 @@ client.once('ready', async () => {
         const embedProgression = new EmbedBuilder()
             .setTitle("Promotion System")
             .setColor(lufthansaBlue)
-            .setDescription("Before you start flying, you will be assigned to **Lufthansa City (LHX)** operations.")
-            .addFields(
-                { 
-                    name: "Second Officer", 
-                    value: "• **0 Flight Logs:** Restricted to Lufthansa City (LHX) operations (e.g., EDDM-LIRF, EDDF-LFPG, and Domestic). You are authorized to fly the A320neo.", 
-                    inline: false 
-                },
-                { 
-                    name: "First Officer", 
-                    value: "• **15 Flight Logs:** Promoted to mainline operations. You are now authorized to fly all normal Lufthansa (DLH) routes alongside your LHX routes.", 
-                    inline: false 
-                },
-                { 
-                    name: "Senior First Officer", 
-                    value: "• **60 Flight Logs:** Choose your path! Pick your first Type Rating for Medium Haul passenger operations (`A350` or `A330`) **OR** transition to Lufthansa Cargo (`B777F`).\n" +
-                           "• **100 Flight Logs (Checkpoint):** Unlock an *additional* Type Rating from the Medium Haul / Cargo pool!", 
-                    inline: false 
-                },
-                { 
-                    name: "Captain", 
-                    value: "• **150 Flight Logs:** Reach the peak. Unlocks our heavy & long-haul fleet. Pick your first rating (`B747-8` or `A380`).\n" + 
-                           "• **200 Flight Logs (Checkpoint):** Master of the skies. Unlock your final heavy/long-haul rating!", 
-                    inline: false 
-                },
-                { 
-                    name: "SPECIAL AIRCRAFT", 
-                    value: "• **ATR72:** Exclusive to Server Boosters / Supporters.", 
-                    inline: false 
-                }
+            .setDescription(
+                "Before you start flying, you will be assigned to **Lufthansa City (LHX)** operations.\n\n" +
+                
+                "<@&1506356938823303178>\n" +
+                "• **0 Flight Logs:** Restricted to Lufthansa City (LHX) operations (e.g., EDDM-LIRF, EDDF-LFPG, and Domestic).\n" +
+                "• Authorized to fly the **A320neo**.\n\n" +
+
+                "<@&1506356891800961137>\n" +
+                "• **15 Flight Logs:** Promoted to mainline operations.\n" +
+                "• Authorized to fly all normal Lufthansa (DLH) routes alongside LHX routes.\n\n" +
+
+                "<@&1506356832988303460> / <@&1512873928639381504>\n" +
+                "• **60 Flight Logs:** Choose your path! Pick your first Type Rating for Medium Haul (`A350`, `A330`) **OR** transition to Cargo (`B777F`).\n" +
+                "• **100 Flight Logs:** *Checkpoint!* Unlock an additional Type Rating from the Medium Haul / Cargo pool.\n\n" +
+
+                "<@&1506356784435040306>\n" +
+                "• **150 Flight Logs:** Reach the peak. Unlocks our heavy & long-haul fleet. Pick your first rating (`B747-8`, `A380`).\n" +
+                "• **200 Flight Logs:** *Checkpoint!* Unlock your final heavy/long-haul rating.\n\n" +
+
+                "**SPECIAL AIRCRAFT**\n" +
+                "• **ATR72:** Exclusive to Server Boosters / Supporters."
             );
 
         await channel.send({ embeds: [embedWelcome, embedProgression], files: [bannerFile] });
