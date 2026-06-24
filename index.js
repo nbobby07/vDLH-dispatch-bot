@@ -142,10 +142,12 @@ async function getFlightsToAward(dep, arr) {
 }
 
 // Helper function to check promotions
-async function checkPromotions(member, userRecord, guild) {
+async function checkPromotions(member, userRecord, guild, flightsAwarded = 1) {
     let newRankRole = null;
     let newRankName = null;
     let planeOptions = [];
+    
+    const previousFlightCount = userRecord.flightCount - flightsAwarded;
     
     // Find the highest promotion tier the user qualifies for
     let currentTierIndex = -1;
@@ -174,8 +176,10 @@ async function checkPromotions(member, userRecord, guild) {
             }
         }
         
-        // Check if they just hit the exact flight requirement for a promotion
-        if (userRecord.flightCount === tier.flightsRequired) {
+        // Check if they just crossed the threshold for a promotion
+        const justPromoted = (previousFlightCount < tier.flightsRequired && userRecord.flightCount >= tier.flightsRequired);
+        
+        if (justPromoted) {
             newRankName = tier.rankName;
             
             if (tier.rankRoleId !== "NO ROLE FOR THIS RANK" && !tier.rankRoleId.startsWith("ROLE_ID_")) {
@@ -377,7 +381,7 @@ client.on(Events.MessageCreate, async (message) => {
                 const member = await message.guild.members.fetch(userId);
                 
                 // Check if they earned a promotion or new plane
-                const promo = await checkPromotions(member, updatedUser, message.guild);
+                const promo = await checkPromotions(member, updatedUser, message.guild, 1);
                 
                 // If they have plane options to pick, DM them
                 if (promo.planeOptions.length > 0) {
@@ -720,7 +724,7 @@ Return a valid JSON object ONLY:
                 const boostText = flightsToAward > 1 ? ` (+${flightsToAward} Route Boost!)` : ``;
                 try {
                     const member = await interaction.guild.members.fetch(pilotUser.id);
-                    const promo = await checkPromotions(member, updatedUser, interaction.guild);
+                    const promo = await checkPromotions(member, updatedUser, interaction.guild, flightsToAward);
                     
                     if (promo.planeOptions.length > 0) {
                         const selectMenu = new StringSelectMenuBuilder()
@@ -1063,7 +1067,7 @@ Return a valid JSON object ONLY:
             try {
                 const member = await interaction.guild.members.fetch(targetUser.id);
                 const updatedUser = await db.getUser(targetUser.id);
-                const promo = await checkPromotions(member, updatedUser, interaction.guild);
+                const promo = await checkPromotions(member, updatedUser, interaction.guild, flightsToAward);
                 
                 if (promo.planeOptions.length > 0) {
                     const selectMenu = new StringSelectMenuBuilder()
@@ -1543,7 +1547,7 @@ Return a valid JSON object ONLY:
                         const boostText = flightsToAward > 1 ? ` (+${flightsToAward} Route Boost!)` : ``;
                         try {
                             const member = await guild.members.fetch(pilotUser.id);
-                            const promo = await checkPromotions(member, updatedUser, guild);
+                            const promo = await checkPromotions(member, updatedUser, guild, flightsToAward);
                             
                             if (promo.planeOptions.length > 0) {
                                 const selectMenu = new StringSelectMenuBuilder()
@@ -1771,7 +1775,7 @@ Return a valid JSON object ONLY:
                 const updatedUser = await db.incrementFlightCount(pilotId, flightsToAward);
                 try {
                     const member = await interaction.guild.members.fetch(pilotId);
-                    const promo = await checkPromotions(member, updatedUser, interaction.guild);
+                    const promo = await checkPromotions(member, updatedUser, interaction.guild, flightsToAward);
                     
                     if (promo.planeOptions.length > 0) {
                         const selectMenu = new StringSelectMenuBuilder()
