@@ -55,7 +55,7 @@ module.exports = {
 
     // Map each plane name to its corresponding Discord Role ID
     PLANE_ROLES: {
-        "ATR72": "1507311793175924776", // Reused E190 role ID for now
+        "ATR72": "1507311760711876648", // New ATR72 role ID
         "A330": "REPLACE_ME_A330_ROLE_ID",
         "A320neo": "1507311824427814932",
         "A350": "1507311916144394270", // Reused B787 role ID for now
