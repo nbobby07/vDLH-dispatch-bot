@@ -461,9 +461,11 @@ client.on(Events.InteractionCreate, async (interaction) => {
                 components: [row]
             });
         } else if (interaction.commandName === 'dispatch') {
+            await interaction.deferReply({ ephemeral: true });
+            
             const userRecord = await db.getUser(interaction.user.id);
             if (!userRecord || userRecord.unlockedPlanes.length === 0) {
-                return interaction.reply({ content: "You haven't unlocked any aircraft yet! Please use /register to get started.", ephemeral: true });
+                return interaction.editReply({ content: "You haven't unlocked any aircraft yet! Please use /register to get started." });
             }
             
             const planes = userRecord.unlockedPlanes;
@@ -479,7 +481,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
             if (canCargo) options.push({ label: 'Cargo', description: 'Lufthansa Cargo operations', value: 'Cargo' });
 
             if (options.length === 0) {
-                return interaction.reply({ content: "Your unlocked planes don't match any known haul types.", ephemeral: true });
+                return interaction.editReply({ content: "Your unlocked planes don't match any known haul types." });
             }
 
             const row = new ActionRowBuilder().addComponents(
@@ -489,10 +491,9 @@ client.on(Events.InteractionCreate, async (interaction) => {
                     .addOptions(options)
             );
 
-            await interaction.reply({
+            await interaction.editReply({
                 content: 'Welcome to vDLH Dispatch. Please select your operational flight type:',
-                components: [row],
-                ephemeral: true
+                components: [row]
             });
         } else if (interaction.commandName === 'land') {
             await interaction.deferReply({ ephemeral: false }); // Needs to be visible maybe? Or ephemeral. Let's do ephemeral so it doesn't clog.
