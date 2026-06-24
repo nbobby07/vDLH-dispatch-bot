@@ -40,7 +40,7 @@ client.once('ready', async () => {
 
                 "<@&1506356891800961137>\n" +
                 "• **15 Flight Logs:** Promoted to mainline operations.\n" +
-                "• Authorized to fly all normal Lufthansa (DLH) routes alongside LHX routes.\n\n" +
+                "• Authorized to fly all Short-Haul flights using the main Lufthansa (DLH) callsign, alongside your LHX routes.\n\n" +
 
                 "<@&1506356832988303460> / <@&1512873928639381504>\n" +
                 "• **60 Flight Logs:** Choose your path! Pick your first Type Rating for Medium Haul (`A350`, `A330`) **OR** transition to Cargo (`B777F`).\n" +
