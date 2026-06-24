@@ -912,7 +912,7 @@ Return a valid JSON object ONLY:
             // Header Text
             ctx.fillStyle = titleColor;
             ctx.font = 'bold 30px "Courier New", Courier, monospace';
-            ctx.fillText('LUFTHANSA', 60, 80);
+            ctx.fillText('Lufthansa Virtual Airlines', 60, 80);
 
             // Subtitle
             ctx.fillStyle = subtitleColor;
@@ -1303,9 +1303,10 @@ DISPATCHER: AUTO-DISPATCH                   PIC NAME: ${interaction.user.usernam
         }
     } else if (interaction.isButton()) {
         if (interaction.customId.startsWith('land_flight_')) {
+            await interaction.deferReply({ ephemeral: true });
             const pilotId = interaction.customId.replace('land_flight_', '');
             if (interaction.user.id !== pilotId) {
-                return interaction.reply({ content: 'You can only land your own flight!', ephemeral: true });
+                return interaction.editReply({ content: 'You can only land your own flight!' });
             }
             
             const msgId = interaction.message.id;
@@ -1348,7 +1349,7 @@ DISPATCHER: AUTO-DISPATCH                   PIC NAME: ${interaction.user.usernam
                     components: [dmRow]
                 });
                 
-                await interaction.reply({ content: "📩 Check your DMs! I've sent you a secure link to upload your proof.", ephemeral: true });
+                await interaction.editReply({ content: "📩 Check your DMs! I've sent you a secure link to upload your proof." });
                 
                 const filter = m => m.author.id === pilotId && m.attachments.size > 0;
                 const collector = dmChannel.createMessageCollector({ filter, time: 300000, max: 1 });
@@ -1448,6 +1449,7 @@ Return a valid JSON object ONLY:
                 }
             } catch (err) {
                 console.error("OpenAI verification error:", err);
+                aiReasoning = `AI Error: ${err.message}`;
             }
                     
                     if (autoApproved) {
