@@ -33,7 +33,7 @@ client.once('ready', async () => {
             .setColor(lufthansaBlue)
             .addFields(
                 { name: "SHORT-HAUL FLEET", value: "• A320neo", inline: false },
-                { name: "MEDIUM-HAUL FLEET", value: "• A330\n• B787", inline: false },
+                { name: "MEDIUM-HAUL FLEET", value: "• A330\n• A350", inline: false },
                 { name: "HEAVY & LONG-HAUL FLEET", value: "• B747-8\n• A380", inline: false },
                 { name: "LUFTHANSA CARGO", value: "• B777F", inline: false },
                 { name: "SPECIAL OPERATIONS", value: "• ATR72 - **Booster / Supporter Exclusive**", inline: false }

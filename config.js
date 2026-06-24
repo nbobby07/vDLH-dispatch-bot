@@ -27,7 +27,7 @@ module.exports = {
             flightsRequired: 35,
             rankName: "Senior First Officer",
             rankRoleId: "1506356832988303460",
-            unlocks: ["B787", "A330"],
+            unlocks: ["A350", "A330"],
             canPick: 2
         },
         {
@@ -44,7 +44,7 @@ module.exports = {
         "ATR72": "1507311793175924776", // Reused E190 role ID for now
         "A330": "REPLACE_ME_A330_ROLE_ID",
         "A320neo": "1507311824427814932",
-        "B787": "1507311916144394270",
+        "A350": "1507311916144394270", // Reused B787 role ID for now
         "B747-8": "1507312037720752190",
         "A380": "1507312009669120101",
         "B777F": "1507311947362730085"
