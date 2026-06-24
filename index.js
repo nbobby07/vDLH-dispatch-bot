@@ -473,7 +473,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
             }
             
             const flightCount = userRecord.flightCount || 0;
-            let newPlanes = ['A320neo', 'E190'];
+            let newPlanes = ['A320neo'];
             
             const oldPlanes = userRecord.unlockedPlanes || [];
             

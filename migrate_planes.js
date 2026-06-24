@@ -19,7 +19,6 @@ async function run() {
         try { oldPlanes = JSON.parse(row.unlockedplanes) || []; } catch(e){}
         
         newPlanes.push('A320neo');
-        newPlanes.push('E190');
         
         if (flightCount >= 60) {
             if (oldPlanes.includes('A350') || oldPlanes.includes('B787')) {
