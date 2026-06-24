@@ -2,31 +2,31 @@ const fs = require('fs');
 
 const PAIRINGS = [
     // Short Haul
-    { type: 'Short Haul', dep: 'IRFD', arr: 'IPPH', wpts: 'TOBAK KEMAD' },
-    { type: 'Short Haul', dep: 'IRFD', arr: 'IMLR', wpts: 'ROBUX MUONE' },
-    { type: 'Short Haul', dep: 'IPPH', arr: 'IMLR', wpts: 'TINDR ONDER' },
-    { type: 'Short Haul', dep: 'IRFD', arr: 'ISAU', wpts: 'STACK HOGGS' },
-    { type: 'Short Haul', dep: 'IPPH', arr: 'IZOL', wpts: 'DOGGO MORRD' },
+    { type: 'Short Haul', dep: 'IRFD', arr: 'IPPH', wpts: 'JAMSI SILVA STRAX' },
+    { type: 'Short Haul', dep: 'IRFD', arr: 'IMLR', wpts: 'LOGAN SAWPE' },
+    { type: 'Short Haul', dep: 'IPPH', arr: 'IMLR', wpts: 'STRAX PROBE BUCFA' },
+    { type: 'Short Haul', dep: 'IRFD', arr: 'ISAU', wpts: 'EXMOR SEEKS' },
+    { type: 'Short Haul', dep: 'IPPH', arr: 'IZOL', wpts: 'TALIS DUNKS' },
     
     // Medium Haul
-    { type: 'Medium Haul', dep: 'IRFD', arr: 'ILAR', wpts: 'LAZER IHEN' },
-    { type: 'Medium Haul', dep: 'IPPH', arr: 'ILAR', wpts: 'SISTA JACKI' },
-    { type: 'Medium Haul', dep: 'IPPH', arr: 'IKFL', wpts: 'WELLS SQUID' },
-    { type: 'Medium Haul', dep: 'IRFD', arr: 'IPAP', wpts: 'PEPUL IBAR' },
+    { type: 'Medium Haul', dep: 'IRFD', arr: 'ILAR', wpts: 'LAZER GRASS' },
+    { type: 'Medium Haul', dep: 'IPPH', arr: 'ILAR', wpts: 'CYRIL JUSTY' },
+    { type: 'Medium Haul', dep: 'IPPH', arr: 'IKFL', wpts: 'DCT' },
+    { type: 'Medium Haul', dep: 'IRFD', arr: 'IPAP', wpts: 'LAZER KINDLE' },
     
     // Long Haul
-    { type: 'Long Haul', dep: 'IRFD', arr: 'ITKO', wpts: 'TUDEP ASTRO' },
-    { type: 'Long Haul', dep: 'IRFD', arr: 'IKFL', wpts: 'BLANK FROOT' },
-    { type: 'Long Haul', dep: 'IPPH', arr: 'IPAP', wpts: 'DUNKS IPAP' },
+    { type: 'Long Haul', dep: 'IRFD', arr: 'ITKO', wpts: 'SETHR ALLRY HONDA' },
+    { type: 'Long Haul', dep: 'IRFD', arr: 'IKFL', wpts: 'JAMSI SILVA STRAX' },
+    { type: 'Long Haul', dep: 'IPPH', arr: 'IPAP', wpts: 'CYRIL JUSTY' },
     
     // Cargo
-    { type: 'Cargo', dep: 'IRFD', arr: 'IKFL', wpts: 'BLANK FROOT' },
-    { type: 'Cargo', dep: 'IRFD', arr: 'ITKO', wpts: 'TUDEP ASTRO' },
-    { type: 'Cargo', dep: 'IPPH', arr: 'ITKO', wpts: 'LETSE SHIBA' },
-    { type: 'Cargo', dep: 'IRFD', arr: 'IZOL', wpts: 'OCEEN TRESIN' },
-    { type: 'Cargo', dep: 'IPPH', arr: 'IZOL', wpts: 'DOGGO MORRD' },
-    { type: 'Cargo', dep: 'IRFD', arr: 'ILAR', wpts: 'LAZER IHEN' },
-    { type: 'Cargo', dep: 'IPPH', arr: 'ILAR', wpts: 'SISTA JACKI' }
+    { type: 'Cargo', dep: 'IRFD', arr: 'IKFL', wpts: 'JAMSI SILVA STRAX' },
+    { type: 'Cargo', dep: 'IRFD', arr: 'ITKO', wpts: 'SETHR ALLRY HONDA' },
+    { type: 'Cargo', dep: 'IPPH', arr: 'ITKO', wpts: 'TINDR HONDA' },
+    { type: 'Cargo', dep: 'IRFD', arr: 'IZOL', wpts: 'JAMSI CAWZE TRE' },
+    { type: 'Cargo', dep: 'IPPH', arr: 'IZOL', wpts: 'TALIS DUNKS' },
+    { type: 'Cargo', dep: 'IRFD', arr: 'ILAR', wpts: 'LAZER GRASS' },
+    { type: 'Cargo', dep: 'IPPH', arr: 'ILAR', wpts: 'CYRIL JUSTY' }
 ];
 
 let routesOutput = "const ROUTES = [\n";
@@ -46,4 +46,4 @@ for (const pair of PAIRINGS) {
 routesOutput += "];\n\nmodule.exports = { ROUTES };\n";
 
 fs.writeFileSync('C:\\Users\\Noel\\Desktop\\vBA bot\\routes.js', routesOutput);
-console.log("Successfully rebuilt routes.js for CEO");
+console.log("Successfully rebuilt routes.js for CEO with accurate PTFS waypoints");
