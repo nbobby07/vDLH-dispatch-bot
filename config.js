@@ -13,8 +13,8 @@ module.exports = {
             flightsRequired: 0,
             rankName: "Second Officer",
             rankRoleId: "1506356938823303178",
-            unlocks: ["E190", "A320neo"],
-            canPick: 2
+            unlocks: ["A320neo"],
+            canPick: 1
         },
         {
             flightsRequired: 15,
@@ -27,8 +27,8 @@ module.exports = {
             flightsRequired: 35,
             rankName: "Senior First Officer",
             rankRoleId: "1506356832988303460",
-            unlocks: ["B787"],
-            canPick: 1
+            unlocks: ["B787", "A330"],
+            canPick: 2
         },
         {
             flightsRequired: 75,
@@ -41,7 +41,8 @@ module.exports = {
 
     // Map each plane name to its corresponding Discord Role ID
     PLANE_ROLES: {
-        "E190": "1507311793175924776",
+        "ATR72": "1507311793175924776", // Reused E190 role ID for now
+        "A330": "REPLACE_ME_A330_ROLE_ID",
         "A320neo": "1507311824427814932",
         "B787": "1507311916144394270",
         "B747-8": "1507312037720752190",

@@ -1,5 +1,5 @@
 require('dotenv').config();
-const { Client, GatewayIntentBits, EmbedBuilder } = require('discord.js');
+const { Client, GatewayIntentBits, EmbedBuilder, AttachmentBuilder } = require('discord.js');
 
 const client = new Client({
     intents: [GatewayIntentBits.Guilds]
@@ -20,30 +20,33 @@ client.once('ready', async () => {
         
         const lufthansaBlue = '#05164D';
         const lufthansaYellow = '#FFCC00';
+        
+        const bannerFile = new AttachmentBuilder('C:\\\\Users\\\\Noel\\\\.gemini\\\\antigravity\\\\brain\\\\5bbce9ee-64d9-4a64-9202-a5a91579124d\\\\lufthansa_routes_banner_1782279719951.png');
 
         const embedWelcome = new EmbedBuilder()
             .setTitle("Lufthansa Virtual Routes")
             .setDescription("Welcome to the **Lufthansa Virtual** routes page! Here you will find all the approved dispatch routes you need to fly for our virtual airline. Make sure to file your logs correctly according to these pairs.")
-            .setColor(lufthansaBlue);
+            .setColor(lufthansaBlue)
+            .setImage('attachment://lufthansa_routes_banner_1782279719951.png');
             
         const embedShort = new EmbedBuilder()
-            .setTitle("SHORT-HAUL FLEET: [A320neo / E190]")
+            .setTitle("SHORT-HAUL FLEET: [A320neo / ATR72]")
             .setDescription(
                 "• Frankfurt [IRFD] ↔ Munich [IPPH]\n" +
                 "• Frankfurt [IRFD] ↔ Bremen [IMLR]\n" +
                 "• Munich [IPPH] ↔ Bremen [IMLR]\n\n" +
                 "• Frankfurt [IRFD] ➔ Paris [ISOU]\n" +
-                "• Munich [IPPH] ➔ Rome [IIZO]\n" +
-                "• Bremen [IMLR] ➔ Mallorca [IPAP]"
+                "• Munich [IPPH] ➔ Rome [IIZO]"
             )
             .setColor(lufthansaBlue);
 
         const embedMedium = new EmbedBuilder()
-            .setTitle("MEDIUM-HAUL FLEET: [B787]")
+            .setTitle("MEDIUM-HAUL FLEET: [B787 / A330]")
             .setDescription(
                 "• Frankfurt [IRFD] ➔ Athens [ILAR]\n" +
                 "• Munich [IPPH] ➔ Athens [ILAR]\n" +
-                "• Munich [IPPH] ➔ London [IKFL]"
+                "• Munich [IPPH] ➔ London [IKFL]\n" +
+                "• Frankfurt [IRFD] ➔ Mallorca [IPAP]"
             )
             .setColor(lufthansaBlue);
             
@@ -52,7 +55,7 @@ client.once('ready', async () => {
             .setDescription(
                 "• Frankfurt [IRFD] ➔ Tokyo [ITKO] *(Our main long haul)*\n" +
                 "• Frankfurt [IRFD] ➔ London [IKFL]\n" +
-                "• Frankfurt [IRFD] ➔ Mallorca [IPAP]"
+                "• Munich [IPPH] ➔ Mallorca [IPAP]"
             )
             .setColor(lufthansaBlue);
             
@@ -64,7 +67,7 @@ client.once('ready', async () => {
             )
             .setColor(lufthansaYellow);
 
-        await channel.send({ embeds: [embedWelcome, embedShort, embedMedium, embedLong, embedCargo] });
+        await channel.send({ embeds: [embedWelcome, embedShort, embedMedium, embedLong, embedCargo], files: [bannerFile] });
         console.log("Sent routes!");
         
     } catch (e) {
