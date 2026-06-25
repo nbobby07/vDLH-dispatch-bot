@@ -1210,8 +1210,13 @@ DISPATCHER: AUTO-DISPATCH                   PIC NAME: ${interaction.user.usernam
                     .setCustomId(`land_flight_${interaction.user.id}`)
                     .setLabel('Land Flight')
                     .setStyle(ButtonStyle.Success);
+                    
+                const cancelButton = new ButtonBuilder()
+                    .setCustomId(`cancel_flight_self_${interaction.user.id}`)
+                    .setLabel('Cancel Flight')
+                    .setStyle(ButtonStyle.Danger);
     
-                const liveRow = new ActionRowBuilder().addComponents(landButton);
+                const liveRow = new ActionRowBuilder().addComponents(landButton, cancelButton);
                 await liveChannel.send({ embeds: [liveEmbed], components: [liveRow] });
             }
             
@@ -1222,7 +1227,17 @@ DISPATCHER: AUTO-DISPATCH                   PIC NAME: ${interaction.user.usernam
             });
         }
     } else if (interaction.isButton()) {
-        if (interaction.customId.startsWith('land_flight_')) {
+        if (interaction.customId.startsWith('cancel_flight_self_')) {
+            await interaction.deferReply({ ephemeral: true });
+            const pilotId = interaction.customId.replace('cancel_flight_self_', '');
+            if (interaction.user.id !== pilotId) {
+                return interaction.editReply({ content: 'You can only cancel your own flight!' });
+            }
+            
+            await db.clearActiveFlight(pilotId);
+            try { await interaction.message.delete(); } catch(e) {}
+            return interaction.editReply({ content: "Your active flight has been cancelled." });
+        } else if (interaction.customId.startsWith('land_flight_')) {
             await interaction.deferReply({ ephemeral: true });
             const pilotId = interaction.customId.replace('land_flight_', '');
             if (interaction.user.id !== pilotId) {
