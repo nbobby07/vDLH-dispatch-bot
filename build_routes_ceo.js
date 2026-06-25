@@ -2,41 +2,45 @@ const fs = require('fs');
 
 const AIRPORT_MAP = {
     'IRFD': 'EDDF',
-    'ISAU': 'EDDW',
-    'IMLR': 'EDDH',
-    'IBTH': 'EDDK',
-    'IGRV': 'EGCC',
-    'ISKP': 'EGHI',
-    'IPAP': 'LEPA',
+    'IPPH': 'EDDM',
+    'IMLR': 'EDDW',
+    'ISAU': 'LFPG',
     'IZOL': 'LIRF',
     'ILAR': 'LGAV',
-    'ITKO': 'RJTT',
-    'IPPH': 'YPPH',
-    'ILKL': 'EGLL'
+    'IKFL': 'EGLL',
+    'IPAP': 'LEPA',
+    'ITKO': 'RJTT'
 };
 
 const PAIRINGS = [
-    // Domestic (~250nm, 01:00 time)
-    { type: 'Domestic', dep: 'IRFD', arr: 'ISAU', wpts: 'EXMOR SEEKS', distance: 250, time: '01:00' },
-    { type: 'Domestic', dep: 'IRFD', arr: 'IMLR', wpts: 'LOGAN SAWPE', distance: 260, time: '01:00' },
-    { type: 'Domestic', dep: 'IRFD', arr: 'IBTH', wpts: 'JAMSIA SETHR', distance: 240, time: '01:00' },
+    // Domestic (~250nm, 01:00 time) - LHX Cityline only
+    { type: 'Domestic', dep: 'IRFD', arr: 'IPPH', wpts: 'EXMOR SEEKS', distance: 160, time: '01:00' },
+    { type: 'Domestic', dep: 'IRFD', arr: 'IMLR', wpts: 'LOGAN SAWPE', distance: 180, time: '01:00' },
+    { type: 'Domestic', dep: 'IPPH', arr: 'IMLR', wpts: 'JAMSIA SETHR', distance: 250, time: '01:00' },
     
     // Short Haul (~500nm, 01:45 time)
-    { type: 'Short Haul', dep: 'IRFD', arr: 'IGRV', wpts: 'LOGAN SAU GOLDEN', distance: 510, time: '01:45' },
-    { type: 'Short Haul', dep: 'IRFD', arr: 'ISKP', wpts: 'EXMOR ALDER', distance: 480, time: '01:45' },
+    { type: 'Short Haul', dep: 'IRFD', arr: 'ISAU', wpts: 'LOGAN SAU GOLDEN', distance: 260, time: '01:15' },
+    { type: 'Short Haul', dep: 'IPPH', arr: 'IZOL', wpts: 'EXMOR ALDER', distance: 380, time: '01:30' },
     
     // Medium Haul (~1200nm, 02:45 time)
-    { type: 'Medium Haul', dep: 'IRFD', arr: 'IPAP', wpts: 'LAZER KINDLE', distance: 1100, time: '02:45' },
-    { type: 'Medium Haul', dep: 'IRFD', arr: 'IZOL', wpts: 'JAMSI CAWZE TRE', distance: 1250, time: '02:45' },
-    { type: 'Medium Haul', dep: 'IRFD', arr: 'ILAR', wpts: 'LAZER GRASS', distance: 1350, time: '03:15' },
+    { type: 'Medium Haul', dep: 'IRFD', arr: 'ILAR', wpts: 'LAZER GRASS', distance: 1000, time: '02:45' },
+    { type: 'Medium Haul', dep: 'IPPH', arr: 'ILAR', wpts: 'JAMSI CAWZE TRE', distance: 800, time: '02:15' },
+    { type: 'Medium Haul', dep: 'IPPH', arr: 'IKFL', wpts: 'LAZER GRASS', distance: 500, time: '01:45' },
+    { type: 'Medium Haul', dep: 'IRFD', arr: 'IPAP', wpts: 'JAMSI CAWZE TRE', distance: 680, time: '02:00' },
     
     // Long Haul (~4500nm, 10:30 time)
-    { type: 'Long Haul', dep: 'IRFD', arr: 'ITKO', wpts: 'SETHR ALLRY HONDA', distance: 5200, time: '11:30' },
-    { type: 'Long Haul', dep: 'IRFD', arr: 'IPPH', wpts: 'JAMSI SILVA STRAX', distance: 7500, time: '16:00' },
+    { type: 'Long Haul', dep: 'IRFD', arr: 'ITKO', wpts: 'SETHR ALLRY HONDA', distance: 5100, time: '11:15' },
+    { type: 'Long Haul', dep: 'IRFD', arr: 'IKFL', wpts: 'JAMSI SILVA STRAX', distance: 350, time: '01:30' },
+    { type: 'Long Haul', dep: 'IPPH', arr: 'IPAP', wpts: 'JAMSI SILVA STRAX', distance: 630, time: '02:00' },
     
     // Cargo (~3000nm, 05:30 time)
-    { type: 'Cargo', dep: 'IRFD', arr: 'ILKL', wpts: 'JAMSI SILVA STRAX', distance: 400, time: '01:30' },
-    { type: 'Cargo', dep: 'IRFD', arr: 'IPPH', wpts: 'TINDR HONDA', distance: 4800, time: '12:00' }
+    { type: 'Cargo', dep: 'IRFD', arr: 'IKFL', wpts: 'JAMSI SILVA STRAX', distance: 350, time: '01:30' },
+    { type: 'Cargo', dep: 'IRFD', arr: 'ITKO', wpts: 'TINDR HONDA', distance: 5100, time: '11:15' },
+    { type: 'Cargo', dep: 'IPPH', arr: 'ITKO', wpts: 'TINDR HONDA', distance: 5050, time: '11:10' },
+    { type: 'Cargo', dep: 'IRFD', arr: 'IZOL', wpts: 'JAMSI SILVA STRAX', distance: 520, time: '01:45' },
+    { type: 'Cargo', dep: 'IPPH', arr: 'IZOL', wpts: 'JAMSI SILVA STRAX', distance: 380, time: '01:30' },
+    { type: 'Cargo', dep: 'IRFD', arr: 'ILAR', wpts: 'LAZER GRASS', distance: 1000, time: '02:45' },
+    { type: 'Cargo', dep: 'IPPH', arr: 'ILAR', wpts: 'LAZER GRASS', distance: 800, time: '02:15' }
 ];
 
 let routesOutput = "const ROUTES = [\n";
