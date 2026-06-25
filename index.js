@@ -274,6 +274,13 @@ client.once(Events.ClientReady, async (c) => {
             ]
         },
         {
+            name: 'cancelflight',
+            description: 'Staff: Cancel a live flight',
+            options: [
+                { name: 'user', description: 'The pilot whose flight to cancel', type: 6, required: true }
+            ]
+        },
+        {
             name: 'leaderboard',
             description: 'View the top 10 pilots with the most flights'
         },
@@ -626,6 +633,48 @@ client.on(Events.InteractionCreate, async (interaction) => {
                 .setTimestamp();
 
             await interaction.editReply({ embeds: [ofpEmbed] });
+        } else if (interaction.commandName === 'cancelflight') {
+            await interaction.deferReply({ ephemeral: true });
+            
+            const dispatcherRoleId = config.DISPATCHER_ROLE_ID;
+            if (!interaction.member.permissions.has('Administrator') && !interaction.member.roles.cache.has(dispatcherRoleId)) {
+                return interaction.editReply({ content: "❌ You do not have permission to cancel flights." });
+            }
+
+            const targetUser = interaction.options.getUser('user');
+            
+            const activeFlight = await db.getActiveFlight({ userId: targetUser.id });
+            if (!activeFlight) {
+                return interaction.editReply({ content: "❌ This user does not have an active flight." });
+            }
+            
+            await db.clearActiveFlight(targetUser.id);
+            
+            let liveChannelId = await db.getSetting('LIVE_FLIGHTS_CHANNEL_ID');
+            if (!liveChannelId) liveChannelId = config.LIVE_FLIGHTS_CHANNEL_ID;
+            
+            if (liveChannelId && !liveChannelId.startsWith('REPLACE_')) {
+                try {
+                    const liveChannel = await interaction.guild.channels.fetch(liveChannelId);
+                    const messages = await liveChannel.messages.fetch({ limit: 50 });
+                    
+                    const activeMsg = messages.find(m => {
+                        if (m.embeds.length === 0) return false;
+                        const embed = m.embeds[0];
+                        if (embed.title !== '🛫 Live Flight') return false;
+                        const pilotField = embed.fields.find(f => f.name === 'Pilot');
+                        return pilotField && pilotField.value.includes(targetUser.id);
+                    });
+                    
+                    if (activeMsg) {
+                        await activeMsg.delete();
+                    }
+                } catch (err) {
+                    console.error("Failed to delete live flight message:", err);
+                }
+            }
+            
+            await interaction.editReply({ content: `✅ Successfully cancelled the active flight for <@${targetUser.id}>.` });
         } else if (interaction.commandName === 'land') {
             await interaction.deferReply({ ephemeral: false }); // Needs to be visible maybe? Or ephemeral. Let's do ephemeral so it doesn't clog.
             
