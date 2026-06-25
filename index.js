@@ -266,6 +266,14 @@ client.once(Events.ClientReady, async (c) => {
             ]
         },
         {
+            name: 'ofp',
+            description: 'View the live OFP of a current flight',
+            options: [
+                { name: 'user', description: 'The pilot to search for', type: 6, required: false },
+                { name: 'callsign', description: 'The callsign to search for', type: 3, required: false }
+            ]
+        },
+        {
             name: 'leaderboard',
             description: 'View the top 10 pilots with the most flights'
         },
@@ -592,6 +600,32 @@ client.on(Events.InteractionCreate, async (interaction) => {
                 content: 'Welcome to vDLH Dispatch. Please select your operational flight type:',
                 components: [row]
             });
+        } else if (interaction.commandName === 'ofp') {
+            await interaction.deferReply({ ephemeral: false });
+            const targetUser = interaction.options.getUser('user');
+            const targetCallsign = interaction.options.getString('callsign');
+
+            if (!targetUser && !targetCallsign) {
+                return interaction.editReply({ content: "You must provide either a user or a callsign to search for!" });
+            }
+
+            const query = {};
+            if (targetUser) query.userId = targetUser.id;
+            if (targetCallsign) query.callsign = targetCallsign;
+
+            const activeFlight = await db.getActiveFlight(query);
+            if (!activeFlight) {
+                return interaction.editReply({ content: "❌ No active flight found matching that criteria. They might not have dispatched yet, or they already landed." });
+            }
+
+            const ofpEmbed = new EmbedBuilder()
+                .setTitle(`📝 Live OFP: ${activeFlight.callsign}`)
+                .setColor('#05164D')
+                .setDescription(`\`\`\`text\n${activeFlight.ofptext}\n\`\`\``) // Postgres lowercase columns
+                .setFooter({ text: `Requested by ${interaction.user.username}` })
+                .setTimestamp();
+
+            await interaction.editReply({ embeds: [ofpEmbed] });
         } else if (interaction.commandName === 'land') {
             await interaction.deferReply({ ephemeral: false }); // Needs to be visible maybe? Or ephemeral. Let's do ephemeral so it doesn't clog.
             
@@ -728,6 +762,7 @@ Return a valid JSON object ONLY:
             if (autoApproved) {
                 await db.incrementMetric('ai_auto_approved');
                 const flightsToAward = await getFlightsToAward(dep, arr);
+                await db.clearActiveFlight(pilotUser.id);
                 const updatedUser = await db.incrementFlightCount(pilotUser.id, flightsToAward);
                 const boostText = flightsToAward > 1 ? ` (+${flightsToAward} Route Boost!)` : ``;
                 try {
@@ -1372,6 +1407,9 @@ DISPATCHER: AUTO-DISPATCH                   PIC NAME: ${interaction.user.usernam
                 .setColor('#05164D')
                 .setDescription(`\`\`\`text\n${ofpText}\n\`\`\``);
 
+            // Save OFP to database for live viewing
+            await db.setActiveFlight(interaction.user.id, callsign, ofpText);
+
             // Post to Live Flights channel
             let liveChannelId = await db.getSetting('LIVE_FLIGHTS_CHANNEL_ID');
             if (!liveChannelId) liveChannelId = config.LIVE_FLIGHTS_CHANNEL_ID;
@@ -1559,7 +1597,8 @@ Return a valid JSON object ONLY:
                     if (autoApproved) {
                         await db.incrementMetric('ai_auto_approved');
                         const flightsToAward = await getFlightsToAward(dep, arr);
-                        const updatedUser = await db.incrementFlightCount(pilotUser.id, flightsToAward);
+                        await db.clearActiveFlight(pilotUser.id);
+                    const updatedUser = await db.incrementFlightCount(pilotUser.id, flightsToAward);
                         const boostText = flightsToAward > 1 ? ` (+${flightsToAward} Route Boost!)` : ``;
                         try {
                             const member = await guild.members.fetch(pilotUser.id);
@@ -1788,6 +1827,7 @@ Return a valid JSON object ONLY:
                 await interaction.editReply({ embeds: [updatedEmbed], components: [] });
                 
                 // Process the promotion
+                await db.clearActiveFlight(pilotId);
                 const updatedUser = await db.incrementFlightCount(pilotId, flightsToAward);
                 try {
                     const member = await interaction.guild.members.fetch(pilotId);

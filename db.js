@@ -36,6 +36,13 @@ const usersCache = new Map();
                 count INTEGER DEFAULT 0
             )
         `);
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS active_flights (
+                userId VARCHAR(255) PRIMARY KEY,
+                callsign VARCHAR(50),
+                ofpText TEXT
+            )
+        `);
     } catch (err) {
         console.error("Failed to initialize database:", err);
     }
@@ -154,5 +161,23 @@ module.exports = {
             metrics[r.key] = r.count;
         }
         return metrics;
+    },
+    setActiveFlight: async (userId, callsign, ofpText) => {
+        await pool.query(
+            'INSERT INTO active_flights (userId, callsign, ofpText) VALUES ($1, $2, $3) ON CONFLICT (userId) DO UPDATE SET callsign = $2, ofpText = $3',
+            [userId, callsign, ofpText]
+        );
+    },
+    getActiveFlight: async (query) => {
+        let res;
+        if (query.userId) {
+            res = await pool.query('SELECT * FROM active_flights WHERE userId = $1', [query.userId]);
+        } else if (query.callsign) {
+            res = await pool.query('SELECT * FROM active_flights WHERE LOWER(callsign) = LOWER($1)', [query.callsign]);
+        }
+        return res && res.rows.length > 0 ? res.rows[0] : null;
+    },
+    clearActiveFlight: async (userId) => {
+        await pool.query('DELETE FROM active_flights WHERE userId = $1', [userId]);
     }
 };
