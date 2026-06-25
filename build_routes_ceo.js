@@ -51,12 +51,12 @@ for (const pair of PAIRINGS) {
     const irlArr = AIRPORT_MAP[pair.arr] || pair.arr;
     
     // Forward route
-    const routingFwd = `${pair.dep} RDV/DCT/Active SID ${pair.wpts} RDV/DCT/Active STAR ${pair.arr}`;
+    const routingFwd = `${irlDep} RDV/DCT/Active SID ${pair.wpts} RDV/DCT/Active STAR ${irlArr}`;
     routesOutput += `    { id: '${idCounter++}', type: '${pair.type}', departure: '${irlDep}', arrival: '${irlArr}', routing: '${routingFwd}', time: '${pair.time}', distance: ${pair.distance} },\n`;
     
     // Return route (reverse waypoints)
     const revWpts = pair.wpts.split(' ').reverse().join(' ');
-    const routingRev = `${pair.arr} RDV/DCT/Active SID ${revWpts} RDV/DCT/Active STAR ${pair.dep}`;
+    const routingRev = `${irlArr} RDV/DCT/Active SID ${revWpts} RDV/DCT/Active STAR ${irlDep}`;
     routesOutput += `    { id: '${idCounter++}', type: '${pair.type}', departure: '${irlArr}', arrival: '${irlDep}', routing: '${routingRev}', time: '${pair.time}', distance: ${pair.distance} },\n`;
 }
 
