@@ -1151,6 +1151,9 @@ Return a valid JSON object ONLY:
                 return interaction.editReply({ embeds: [embed] });
             }
             
+            const oldUser = await db.getUser(targetUser.id);
+            const oldCount = oldUser ? oldUser.flightCount : 0;
+
             await db.setFlightCount(targetUser.id, count);
             const embed = new EmbedBuilder().setColor("#00FF00").setDescription(`Successfully set <@${targetUser.id}>'s flight count to **${count}**.`);
             await interaction.editReply({ embeds: [embed] });
@@ -1159,7 +1162,11 @@ Return a valid JSON object ONLY:
             try {
                 const member = await interaction.guild.members.fetch(targetUser.id);
                 const updatedUser = await db.getUser(targetUser.id);
-                const promo = await checkPromotions(member, updatedUser, interaction.guild, flightsToAward);
+                const flightsAdded = count - oldCount;
+                
+                // Only check for promotions if we actually added flights (so we don't demote or trigger weirdly on negative diffs)
+                if (flightsAdded > 0) {
+                    const promo = await checkPromotions(member, updatedUser, interaction.guild, flightsAdded);
                 
                 if (promo.planeOptions.length > 0) {
                     const selectMenu = new StringSelectMenuBuilder()
@@ -1188,6 +1195,7 @@ Return a valid JSON object ONLY:
                         .setColor("#00FF00")
                         .setDescription(`Your flight count was updated to **${count}** and you have been promoted to **${promo.newRankName}**!`);
                     await sendDM(member, { embeds: [promoEmbed] });
+                }
                 }
             } catch (err) {
                 console.error("Error processing override promotion:", err);
