@@ -1564,7 +1564,7 @@ Return a valid JSON object ONLY:
 
             } catch (error) {
                 console.error("Failed to DM user:", error);
-                return interaction.reply({ content: '🛬 **Time to land!**\nYour DMs are disabled! Please use the `/land` command in the bot channel to attach your screenshot directly.', ephemeral: true });
+                return interaction.editReply({ content: '🛬 **Time to land!**\nYour DMs are disabled! Please temporarily enable your DMs for this server, and then click the **Land Flight** button again.' });
             }
         }
 
