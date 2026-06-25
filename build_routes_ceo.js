@@ -33,14 +33,19 @@ let routesOutput = "const ROUTES = [\n";
 let idCounter = 1;
 
 for (const pair of PAIRINGS) {
+    let timeStr = '01:00';
+    if (pair.type === 'Medium Haul') timeStr = '03:30';
+    if (pair.type === 'Long Haul') timeStr = '08:45';
+    if (pair.type === 'Cargo') timeStr = '05:30';
+
     // Forward route
     const routingFwd = `${pair.dep} RDV/DCT/Active SID ${pair.wpts} RDV/DCT/Active STAR ${pair.arr}`;
-    routesOutput += `    { id: '${idCounter++}', type: '${pair.type}', departure: '${pair.dep}', arrival: '${pair.arr}', routing: '${routingFwd}' },\n`;
+    routesOutput += `    { id: '${idCounter++}', type: '${pair.type}', departure: '${pair.dep}', arrival: '${pair.arr}', routing: '${routingFwd}', time: '${timeStr}' },\n`;
     
     // Return route (reverse waypoints)
     const revWpts = pair.wpts.split(' ').reverse().join(' ');
     const routingRev = `${pair.arr} RDV/DCT/Active SID ${revWpts} RDV/DCT/Active STAR ${pair.dep}`;
-    routesOutput += `    { id: '${idCounter++}', type: '${pair.type}', departure: '${pair.arr}', arrival: '${pair.dep}', routing: '${routingRev}' },\n`;
+    routesOutput += `    { id: '${idCounter++}', type: '${pair.type}', departure: '${pair.arr}', arrival: '${pair.dep}', routing: '${routingRev}', time: '${timeStr}' },\n`;
 }
 
 routesOutput += "];\n\nmodule.exports = { ROUTES };\n";
