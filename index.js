@@ -567,6 +567,11 @@ client.on(Events.InteractionCreate, async (interaction) => {
         } else if (interaction.commandName === 'dispatch') {
             await interaction.deferReply({ ephemeral: true });
             
+            const activeFlight = await db.getActiveFlight({ userId: interaction.user.id });
+            if (activeFlight) {
+                return interaction.editReply({ content: "You already have an active flight! Please land or cancel it first." });
+            }
+            
             const userRecord = await db.getUser(interaction.user.id);
             if (!userRecord || userRecord.unlockedPlanes.length === 0) {
                 return interaction.editReply({ content: "You haven't unlocked any aircraft yet! Please use /register to get started." });
@@ -695,7 +700,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
             await interaction.editReply({ embeds: [embed] });
         } else if (interaction.commandName === 'metrics') {
             await interaction.deferReply({ ephemeral: true });
-            if (interaction.user.id !== '797310456951210034') {
+            if (!interaction.member.permissions.has('Administrator')) {
                 return interaction.editReply({ content: "You do not have permission to use this command." });
             }
             
@@ -1298,6 +1303,11 @@ DISPATCHER: AUTO-DISPATCH                   PIC NAME: ${interaction.user.usernam
                 });
                 
                 collector.on('collect', async m => {
+                    const activeFlightCheck = await db.getActiveFlight({ userId: pilotUser.id });
+                    if (!activeFlightCheck) {
+                        return m.reply("❌ Your flight is no longer active. You may have already landed or cancelled it.");
+                    }
+                    
                     const replyMsg = await m.reply("Processing with AI... ⏳");
                     const proof = m.attachments.first();
                     const proofUrl = proof.url;

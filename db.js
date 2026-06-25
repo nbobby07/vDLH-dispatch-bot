@@ -83,32 +83,31 @@ module.exports = {
         return newUser;
     },
     incrementFlightCount: async (userId, count = 1) => {
-        usersCache.delete(userId);
         const { rows } = await pool.query(
             'INSERT INTO users (userId, flightCount, unlockedPlanes) VALUES ($1, $2, $3) ON CONFLICT (userId) DO UPDATE SET flightCount = users.flightCount + $2 RETURNING flightCount',
             [userId, count, JSON.stringify([])]
         );
+        usersCache.delete(userId);
         for (const id of getLinkedIds(userId)) {
-            usersCache.delete(id);
             await pool.query(
                 'INSERT INTO users (userId, flightCount, unlockedPlanes) VALUES ($1, $2, $3) ON CONFLICT (userId) DO UPDATE SET flightCount = users.flightCount + $2',
                 [id, count, JSON.stringify([])]
             );
+            usersCache.delete(id);
         }
         return { flightCount: rows[0].flightcount };
     },
     addUnlockedPlane: async (userId, plane) => {
         const targetIds = [userId, ...getLinkedIds(userId)];
         for (const id of targetIds) {
-            usersCache.delete(id);
             let user = await module.exports.getUser(id);
             if (!user) {
                 user = await module.exports.createUser(id);
             }
             if (!user.unlockedPlanes.includes(plane)) {
-                user.unlockedPlanes.push(plane);
-                await pool.query('UPDATE users SET unlockedPlanes = $1 WHERE userId = $2', [JSON.stringify(user.unlockedPlanes), id]);
-                usersCache.set(id, user);
+                const newPlanes = [...user.unlockedPlanes, plane];
+                await pool.query('UPDATE users SET unlockedPlanes = $1 WHERE userId = $2', [JSON.stringify(newPlanes), id]);
+                usersCache.delete(id);
             }
         }
     },
@@ -121,17 +120,17 @@ module.exports = {
         return rows.map(r => ({ userId: r.userid, flightCount: r.flightcount }));
     },
     setFlightCount: async (userId, count) => {
-        usersCache.delete(userId);
         await pool.query(
             'INSERT INTO users (userId, flightCount, unlockedPlanes) VALUES ($1, $2, $3) ON CONFLICT (userId) DO UPDATE SET flightCount = $2',
             [userId, count, JSON.stringify([])]
         );
+        usersCache.delete(userId);
         for (const id of getLinkedIds(userId)) {
-            usersCache.delete(id);
             await pool.query(
                 'INSERT INTO users (userId, flightCount, unlockedPlanes) VALUES ($1, $2, $3) ON CONFLICT (userId) DO UPDATE SET flightCount = $2',
                 [id, count, JSON.stringify([])]
             );
+            usersCache.delete(id);
         }
     },
     getSetting: async (key) => {
