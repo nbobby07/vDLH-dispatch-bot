@@ -558,13 +558,21 @@ client.on(Events.InteractionCreate, async (interaction) => {
             }
             
             const planes = userRecord.unlockedPlanes;
-            const canShort = planes.includes('A320neo') || planes.includes('ATR72') || planes.includes('E190');
-            const canMedium = planes.includes('A350') || planes.includes('A330');
-            const canLong = planes.includes('B747-8') || planes.includes('A380');
+            const flightCount = userRecord.flightCount || 0;
+            
+            // Second Officer (0-14): Domestic only
+            // First Officer (15-59): Domestic, Short Haul, Medium Haul
+            // Senior First Officer+ (60+): All routes
+            
+            const canDomestic = true;
+            const canShort = flightCount >= 15;
+            const canMedium = flightCount >= 15;
+            const canLong = flightCount >= 60;
             const canCargo = planes.includes('B777F');
 
             const options = [];
-            if (canShort) options.push({ label: 'Short Haul', description: 'Regional and domestic routes', value: 'Short Haul' });
+            if (canDomestic) options.push({ label: 'Domestic', description: 'Cityline domestic routes (LHX only)', value: 'Domestic' });
+            if (canShort) options.push({ label: 'Short Haul', description: 'Regional European routes', value: 'Short Haul' });
             if (canMedium) options.push({ label: 'Medium Haul', description: 'Continental and medium-range routes', value: 'Medium Haul' });
             if (canLong) options.push({ label: 'Long Haul', description: 'Intercontinental routes', value: 'Long Haul' });
             if (canCargo) options.push({ label: 'Cargo', description: 'Lufthansa Cargo operations', value: 'Cargo' });
@@ -1297,8 +1305,16 @@ Return a valid JSON object ONLY:
             const aircraft = interaction.values[0];
             const route = ROUTES.find(r => r.id === routeId);
             
-            const callsigns = route.callsigns || [`DLH${Math.floor(Math.random() * 900) + 100}`];
-            
+            let callsigns = route.callsigns || [];
+            if (callsigns.length === 0) {
+                if (route.type === 'Cargo') {
+                    callsigns.push(`GEC${Math.floor(Math.random() * 900) + 100}`);
+                } else if (route.type === 'Domestic') {
+                    callsigns.push(`LHX${Math.floor(Math.random() * 900) + 100}`);
+                } else {
+                    callsigns.push(`DLH${Math.floor(Math.random() * 900) + 100}`);
+                }
+            }            
             const row = new ActionRowBuilder().addComponents(
                 new StringSelectMenuBuilder()
                     .setCustomId(`dispatch_callsign:${routeId}:${aircraft}`)

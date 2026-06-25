@@ -1,54 +1,62 @@
 const fs = require('fs');
 
+const AIRPORT_MAP = {
+    'IRFD': 'EDDF',
+    'ISAU': 'EDDW',
+    'IMLR': 'EDDH',
+    'IBTH': 'EDDK',
+    'IGRV': 'EGCC',
+    'ISKP': 'EGHI',
+    'IPAP': 'LEPA',
+    'IZOL': 'LIRF',
+    'ILAR': 'LGAV',
+    'ITKO': 'RJTT',
+    'IPPH': 'YPPH',
+    'ILKL': 'EGLL'
+};
+
 const PAIRINGS = [
-    // Short Haul
-    { type: 'Short Haul', dep: 'IRFD', arr: 'IPPH', wpts: 'JAMSI SILVA STRAX' },
-    { type: 'Short Haul', dep: 'IRFD', arr: 'IMLR', wpts: 'LOGAN SAWPE' },
-    { type: 'Short Haul', dep: 'IPPH', arr: 'IMLR', wpts: 'STRAX PROBE BUCFA' },
-    { type: 'Short Haul', dep: 'IRFD', arr: 'ISAU', wpts: 'EXMOR SEEKS' },
-    { type: 'Short Haul', dep: 'IPPH', arr: 'IZOL', wpts: 'TALIS DUNKS' },
+    // Domestic (~250nm, 01:00 time)
+    { type: 'Domestic', dep: 'IRFD', arr: 'ISAU', wpts: 'EXMOR SEEKS', distance: 250, time: '01:00' },
+    { type: 'Domestic', dep: 'IRFD', arr: 'IMLR', wpts: 'LOGAN SAWPE', distance: 260, time: '01:00' },
+    { type: 'Domestic', dep: 'IRFD', arr: 'IBTH', wpts: 'JAMSIA SETHR', distance: 240, time: '01:00' },
     
-    // Medium Haul
-    { type: 'Medium Haul', dep: 'IRFD', arr: 'ILAR', wpts: 'LAZER GRASS' },
-    { type: 'Medium Haul', dep: 'IPPH', arr: 'ILAR', wpts: 'CYRIL JUSTY' },
-    { type: 'Medium Haul', dep: 'IPPH', arr: 'IKFL', wpts: 'DCT' },
-    { type: 'Medium Haul', dep: 'IRFD', arr: 'IPAP', wpts: 'LAZER KINDLE' },
+    // Short Haul (~500nm, 01:45 time)
+    { type: 'Short Haul', dep: 'IRFD', arr: 'IGRV', wpts: 'LOGAN SAU GOLDEN', distance: 510, time: '01:45' },
+    { type: 'Short Haul', dep: 'IRFD', arr: 'ISKP', wpts: 'EXMOR ALDER', distance: 480, time: '01:45' },
     
-    // Long Haul
-    { type: 'Long Haul', dep: 'IRFD', arr: 'ITKO', wpts: 'SETHR ALLRY HONDA' },
-    { type: 'Long Haul', dep: 'IRFD', arr: 'IKFL', wpts: 'JAMSI SILVA STRAX' },
-    { type: 'Long Haul', dep: 'IPPH', arr: 'IPAP', wpts: 'CYRIL JUSTY' },
+    // Medium Haul (~1200nm, 02:45 time)
+    { type: 'Medium Haul', dep: 'IRFD', arr: 'IPAP', wpts: 'LAZER KINDLE', distance: 1100, time: '02:45' },
+    { type: 'Medium Haul', dep: 'IRFD', arr: 'IZOL', wpts: 'JAMSI CAWZE TRE', distance: 1250, time: '02:45' },
+    { type: 'Medium Haul', dep: 'IRFD', arr: 'ILAR', wpts: 'LAZER GRASS', distance: 1350, time: '03:15' },
     
-    // Cargo
-    { type: 'Cargo', dep: 'IRFD', arr: 'IKFL', wpts: 'JAMSI SILVA STRAX' },
-    { type: 'Cargo', dep: 'IRFD', arr: 'ITKO', wpts: 'SETHR ALLRY HONDA' },
-    { type: 'Cargo', dep: 'IPPH', arr: 'ITKO', wpts: 'TINDR HONDA' },
-    { type: 'Cargo', dep: 'IRFD', arr: 'IZOL', wpts: 'JAMSI CAWZE TRE' },
-    { type: 'Cargo', dep: 'IPPH', arr: 'IZOL', wpts: 'TALIS DUNKS' },
-    { type: 'Cargo', dep: 'IRFD', arr: 'ILAR', wpts: 'LAZER GRASS' },
-    { type: 'Cargo', dep: 'IPPH', arr: 'ILAR', wpts: 'CYRIL JUSTY' }
+    // Long Haul (~4500nm, 10:30 time)
+    { type: 'Long Haul', dep: 'IRFD', arr: 'ITKO', wpts: 'SETHR ALLRY HONDA', distance: 5200, time: '11:30' },
+    { type: 'Long Haul', dep: 'IRFD', arr: 'IPPH', wpts: 'JAMSI SILVA STRAX', distance: 7500, time: '16:00' },
+    
+    // Cargo (~3000nm, 05:30 time)
+    { type: 'Cargo', dep: 'IRFD', arr: 'ILKL', wpts: 'JAMSI SILVA STRAX', distance: 400, time: '01:30' },
+    { type: 'Cargo', dep: 'IRFD', arr: 'IPPH', wpts: 'TINDR HONDA', distance: 4800, time: '12:00' }
 ];
 
 let routesOutput = "const ROUTES = [\n";
 let idCounter = 1;
 
 for (const pair of PAIRINGS) {
-    let timeStr = '01:00';
-    if (pair.type === 'Medium Haul') timeStr = '03:30';
-    if (pair.type === 'Long Haul') timeStr = '08:45';
-    if (pair.type === 'Cargo') timeStr = '05:30';
-
+    const irlDep = AIRPORT_MAP[pair.dep] || pair.dep;
+    const irlArr = AIRPORT_MAP[pair.arr] || pair.arr;
+    
     // Forward route
     const routingFwd = `${pair.dep} RDV/DCT/Active SID ${pair.wpts} RDV/DCT/Active STAR ${pair.arr}`;
-    routesOutput += `    { id: '${idCounter++}', type: '${pair.type}', departure: '${pair.dep}', arrival: '${pair.arr}', routing: '${routingFwd}', time: '${timeStr}' },\n`;
+    routesOutput += `    { id: '${idCounter++}', type: '${pair.type}', departure: '${irlDep}', arrival: '${irlArr}', routing: '${routingFwd}', time: '${pair.time}', distance: ${pair.distance} },\n`;
     
     // Return route (reverse waypoints)
     const revWpts = pair.wpts.split(' ').reverse().join(' ');
     const routingRev = `${pair.arr} RDV/DCT/Active SID ${revWpts} RDV/DCT/Active STAR ${pair.dep}`;
-    routesOutput += `    { id: '${idCounter++}', type: '${pair.type}', departure: '${pair.arr}', arrival: '${pair.dep}', routing: '${routingRev}', time: '${timeStr}' },\n`;
+    routesOutput += `    { id: '${idCounter++}', type: '${pair.type}', departure: '${irlArr}', arrival: '${irlDep}', routing: '${routingRev}', time: '${pair.time}', distance: ${pair.distance} },\n`;
 }
 
 routesOutput += "];\n\nmodule.exports = { ROUTES };\n";
 
 fs.writeFileSync('C:\\Users\\Noel\\Desktop\\vBA bot\\routes.js', routesOutput);
-console.log("Successfully rebuilt routes.js for CEO with accurate PTFS waypoints");
+console.log("Successfully rebuilt routes.js for CEO with accurate PTFS waypoints and IRL codes");
