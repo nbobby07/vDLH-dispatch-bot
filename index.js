@@ -120,6 +120,14 @@ async function sendAuditLog(guild, message) {
 // Helper to determine route boost multiplier
 async function getFlightsToAward(dep, arr) {
     let flightsToAward = 1;
+    const AIRPORT_MAP = {
+        'IRFD': 'EDDF', 'IPPH': 'EDDM', 'IMLR': 'EDDW',
+        'ISAU': 'LFPG', 'IZOL': 'LIRF', 'ILAR': 'LGAV',
+        'IKFL': 'EGLL', 'IPAP': 'LEPA', 'ITKO': 'RJTT'
+    };
+    dep = AIRPORT_MAP[dep] || dep;
+    arr = AIRPORT_MAP[arr] || arr;
+
     try {
         const activeBoostStr = await db.getSetting('ACTIVE_BOOST');
         if (activeBoostStr) {
