@@ -1116,11 +1116,18 @@ client.on(Events.InteractionCreate, async (interaction) => {
                 if (route.type === 'Cargo') {
                     callsigns.push(`GEC${Math.floor(Math.random() * 900) + 100}`);
                 } else if (route.type === 'Domestic') {
-                    callsigns.push(`LHX${Math.floor(Math.random() * 900) + 100}`);
+                    const userRecord = await db.getUser(interaction.user.id);
+                    const flightCount = userRecord ? (userRecord.flightCount || 0) : 0;
+                    if (flightCount >= 15) {
+                        callsigns.push(`DLH${Math.floor(Math.random() * 900) + 100}`);
+                        callsigns.push(`LHX${Math.floor(Math.random() * 900) + 100}`);
+                    } else {
+                        callsigns.push(`LHX${Math.floor(Math.random() * 900) + 100}`);
+                    }
                 } else {
                     callsigns.push(`DLH${Math.floor(Math.random() * 900) + 100}`);
                 }
-            }            
+            }
             const row = new ActionRowBuilder().addComponents(
                 new StringSelectMenuBuilder()
                     .setCustomId(`dispatch_callsign:${routeId}:${aircraft}`)
