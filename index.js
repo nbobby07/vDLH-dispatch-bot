@@ -170,17 +170,19 @@ async function checkPromotions(member, userRecord, guild, flightsAwarded = 1, is
         const tier = config.PROMOTIONS[currentTierIndex];
         const requiresCheckride = (tier.flightsRequired === 60 || tier.flightsRequired === 150);
         
-        // Remove previous rank roles
-        for (let j = 0; j < currentTierIndex; j++) {
-            const oldTier = config.PROMOTIONS[j];
-            if (oldTier.rankRoleId !== "NO ROLE FOR THIS RANK" && 
-                !oldTier.rankRoleId.startsWith("ROLE_ID_") && 
-                oldTier.rankRoleId !== tier.rankRoleId && 
-                member.roles.cache.has(oldTier.rankRoleId)) {
-                try {
-                    await member.roles.remove(oldTier.rankRoleId);
-                } catch (err) {
-                    console.error("Failed to remove old rank role:", err);
+        // Only remove previous rank roles if they are actually getting the new one (i.e. checkride passed or not required)
+        if (!requiresCheckride || isCheckridePass) {
+            for (let j = 0; j < currentTierIndex; j++) {
+                const oldTier = config.PROMOTIONS[j];
+                if (oldTier.rankRoleId !== "NO ROLE FOR THIS RANK" && 
+                    !oldTier.rankRoleId.startsWith("ROLE_ID_") && 
+                    oldTier.rankRoleId !== tier.rankRoleId && 
+                    member.roles.cache.has(oldTier.rankRoleId)) {
+                    try {
+                        await member.roles.remove(oldTier.rankRoleId);
+                    } catch (err) {
+                        console.error("Failed to remove old rank role:", err);
+                    }
                 }
             }
         }
