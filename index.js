@@ -607,19 +607,17 @@ client.on(Events.InteractionCreate, async (interaction) => {
             const planes = userRecord.unlockedPlanes;
             const flightCount = userRecord.flightCount || 0;
             
-            // Second Officer (0-14): Domestic only
-            // First Officer (15-59): Domestic, Short Haul, Medium Haul
-            // Senior First Officer (60-149): Domestic, Short Haul, Medium Haul
+            // Second Officer (0-14): Short Haul only
+            // First Officer (15-59): Short Haul, Medium Haul
+            // Senior First Officer (60-149): Short Haul, Medium Haul
             // Captain+ (150+): All routes
             
-            const canDomestic = true;
-            const canShort = flightCount >= 15;
+            const canShort = true;
             const canMedium = flightCount >= 15;
             const canLong = flightCount >= 150;
             const canCargo = planes.includes('B777F');
 
             const options = [];
-            if (canDomestic) options.push({ label: 'Domestic', description: 'Cityline domestic routes (LHX only)', value: 'Domestic' });
             if (canShort) options.push({ label: 'Short Haul', description: 'Regional European routes', value: 'Short Haul' });
             if (canMedium) options.push({ label: 'Medium Haul', description: 'Continental and medium-range routes', value: 'Medium Haul' });
             if (canLong) options.push({ label: 'Long Haul', description: 'Intercontinental routes', value: 'Long Haul' });
