@@ -150,7 +150,7 @@ async function getFlightsToAward(dep, arr) {
 }
 
 // Helper function to check promotions
-async function checkPromotions(member, userRecord, guild, flightsAwarded = 1) {
+async function checkPromotions(member, userRecord, guild, flightsAwarded = 1, isCheckridePass = false) {
     let newRankRole = null;
     let newRankName = null;
     let planeOptions = [];
@@ -168,6 +168,7 @@ async function checkPromotions(member, userRecord, guild, flightsAwarded = 1) {
     
     if (currentTierIndex !== -1) {
         const tier = config.PROMOTIONS[currentTierIndex];
+        const requiresCheckride = (tier.flightsRequired === 60 || tier.flightsRequired === 150);
         
         // Remove previous rank roles
         for (let j = 0; j < currentTierIndex; j++) {
@@ -187,7 +188,20 @@ async function checkPromotions(member, userRecord, guild, flightsAwarded = 1) {
         // Check if they just crossed the threshold for a promotion
         const justPromoted = (previousFlightCount < tier.flightsRequired && userRecord.flightCount >= tier.flightsRequired);
         
-        if (justPromoted) {
+        if (justPromoted || (requiresCheckride && isCheckridePass)) {
+            if (requiresCheckride && !isCheckridePass) {
+                // They just hit the milestone but need a checkride
+                try {
+                    const dmEmbed = new EmbedBuilder()
+                        .setTitle("Checkride Required!")
+                        .setColor("#FFA500")
+                        .setDescription(`Congratulations on reaching **${userRecord.flightCount} flights**!\n\nTo officially become a **${tier.rankName}** and unlock new aircraft, you must now pass a practical checkride.\nPlease visit the <#1520161271004139530> channel and click the **Request Checkride** button to open a ticket.`);
+                    await sendDM(member, { embeds: [dmEmbed] });
+                } catch (e) {}
+                
+                return { newRankRole: null, newRankName: null, planeOptions: [] };
+            }
+            
             newRankName = tier.rankName;
             
             if (tier.rankRoleId !== "NO ROLE FOR THIS RANK" && !tier.rankRoleId.startsWith("ROLE_ID_")) {
@@ -214,15 +228,21 @@ async function checkPromotions(member, userRecord, guild, flightsAwarded = 1) {
             }
         } else if (tier.rankRoleId !== "NO ROLE FOR THIS RANK" && !tier.rankRoleId.startsWith("ROLE_ID_") && !member.roles.cache.has(tier.rankRoleId)) {
             // Catch-up: they have the flights but are missing the role
-            try {
-                await member.roles.add(tier.rankRoleId);
-            } catch (err) {
-                console.error("Failed to catch-up rank role:", err);
+            if (!requiresCheckride) {
+                try {
+                    await member.roles.add(tier.rankRoleId);
+                } catch (err) {
+                    console.error("Failed to catch-up rank role:", err);
+                }
             }
         }
         
         // Determine what planes they could unlock at this tier
         let optionsToPickFrom = tier.unlocks;
+        
+        if (requiresCheckride && !member.roles.cache.has(tier.rankRoleId) && !isCheckridePass) {
+            optionsToPickFrom = [];
+        }
         
         // Let's check what they already unlocked from these options
         const alreadyUnlockedFromThisTier = optionsToPickFrom.filter(p => userRecord.unlockedPlanes.includes(p));
@@ -363,6 +383,11 @@ client.once(Events.ClientReady, async (c) => {
                 { name: 'airport1', description: 'Primary airport (or Departure if Specific Route)', type: 3, required: false, choices: AIRPORT_CHOICES },
                 { name: 'airport2', description: 'Arrival airport (Only if Specific Route)', type: 3, required: false, choices: AIRPORT_CHOICES }
             ]
+        },
+        {
+            name: 'setup-tri',
+            description: 'Setup the TRI Checkride Ticket panel in the current channel',
+            default_member_permissions: '8' // Administrator
         }
     ];
     const rest = new REST().setToken(process.env.DISCORD_TOKEN);
@@ -955,6 +980,28 @@ client.on(Events.InteractionCreate, async (interaction) => {
                 const embed = new EmbedBuilder().setColor("#FF0000").setDescription("Failed to create audit channel. Ensure I have the 'Manage Channels' permission.");
                 await interaction.editReply({ embeds: [embed] });
             }
+        } else if (interaction.commandName === 'setup-tri') {
+            if (!interaction.member.permissions.has('Administrator')) {
+                const embed = new EmbedBuilder().setColor("#FF0000").setDescription("You do not have permission to use this command.");
+                return interaction.reply({ embeds: [embed], ephemeral: true });
+            }
+            await interaction.deferReply({ ephemeral: true });
+            
+            const embed = new EmbedBuilder()
+                .setTitle("📝 Request a Checkride")
+                .setColor("#005C99")
+                .setDescription("Ready for your promotion to **Senior First Officer** (60+ flights) or **Captain** (150+ flights)?\n\nClick the button below to open a private ticket with our Type Rating Instructors (TRI). They will guide you through the practical checkride process!");
+                
+            const btn = new ButtonBuilder()
+                .setCustomId('create_checkride_ticket')
+                .setLabel('Request Checkride')
+                .setStyle(ButtonStyle.Primary)
+                .setEmoji('✈️');
+                
+            const row = new ActionRowBuilder().addComponents(btn);
+            
+            await interaction.channel.send({ embeds: [embed], components: [row] });
+            await interaction.editReply({ content: "Checkride panel created successfully." });
         } else if (interaction.commandName === 'set-log-channel') {
             if (!interaction.member.permissions.has('Administrator')) {
                 const embed = new EmbedBuilder().setColor("#FF0000").setDescription("You do not have permission to use this command.");
@@ -1232,7 +1279,156 @@ DISPATCHER: AUTO-DISPATCH                   PIC NAME: ${interaction.user.usernam
             });
         }
     } else if (interaction.isButton()) {
-        if (interaction.customId.startsWith('cancel_flight_self_')) {
+        if (interaction.customId === 'create_checkride_ticket') {
+            await interaction.deferReply({ ephemeral: true });
+            const userRecord = await db.getUser(interaction.user.id);
+            if (!userRecord) {
+                return interaction.editReply("❌ You are not registered.");
+            }
+            const flights = userRecord.flightCount || 0;
+            if (flights < 60) {
+                return interaction.editReply("❌ You do not have enough flights to request a checkride. (Requires 60+)");
+            }
+            
+            // Determine which checkride it is
+            let targetRank = "";
+            let rankRole = "";
+            if (flights >= 150) {
+                targetRank = "Captain";
+                rankRole = "1506356784435040306"; // Captain role ID
+            } else {
+                targetRank = "Senior First Officer";
+                rankRole = "1506356832988303460"; // SFO role ID
+            }
+            
+            // Make sure they don't already have the role
+            if (interaction.member.roles.cache.has(rankRole)) {
+                return interaction.editReply(`❌ You already have the **${targetRank}** role!`);
+            }
+            
+            // Check if they already have a thread open
+            const threadName = `checkride-${interaction.user.username}`;
+            const existingThread = interaction.channel.threads.cache.find(t => t.name === threadName && !t.archived);
+            if (existingThread) {
+                return interaction.editReply(`❌ You already have an open checkride ticket: <#${existingThread.id}>`);
+            }
+
+            try {
+                const thread = await interaction.channel.threads.create({
+                    name: threadName,
+                    type: 12, // PrivateThread
+                    invitable: false,
+                    reason: `Checkride requested by ${interaction.user.username}`
+                });
+                
+                await thread.members.add(interaction.user.id);
+                
+                const embed = new EmbedBuilder()
+                    .setTitle(`${targetRank} Checkride`)
+                    .setColor("#005C99")
+                    .setDescription(`Welcome to your checkride, <@${interaction.user.id}>!\n\nA Type Rating Instructor (<@&${config.TRI_ROLE_ID}>) will be with you shortly to coordinate your examination.\n\n**Current Flights:** ${flights}`);
+                    
+                const passBtn = new ButtonBuilder()
+                    .setCustomId(`pass_checkride_${interaction.user.id}`)
+                    .setLabel('Pass Checkride')
+                    .setStyle(ButtonStyle.Success);
+                    
+                const closeBtn = new ButtonBuilder()
+                    .setCustomId('close_checkride')
+                    .setLabel('Close Ticket')
+                    .setStyle(ButtonStyle.Danger);
+                    
+                const row = new ActionRowBuilder().addComponents(passBtn, closeBtn);
+                
+                await thread.send({ content: `<@${interaction.user.id}> <@&${config.TRI_ROLE_ID}>`, embeds: [embed], components: [row] });
+                
+                await interaction.editReply(`✅ Your checkride ticket has been created: <#${thread.id}>`);
+            } catch (err) {
+                console.error("Failed to create private thread:", err);
+                await interaction.editReply("❌ Failed to create the ticket. Ensure I have permissions to create Private Threads (Use Private Threads / Send Messages in Threads).");
+            }
+        } else if (interaction.customId.startsWith('pass_checkride_')) {
+            const pilotId = interaction.customId.replace('pass_checkride_', '');
+            
+            // Check permissions (must have TRI role or Administrator)
+            if (!interaction.member.permissions.has('Administrator') && !interaction.member.roles.cache.has(config.TRI_ROLE_ID)) {
+                return interaction.reply({ content: "❌ Only Type Rating Instructors can pass checkrides.", ephemeral: true });
+            }
+            
+            await interaction.deferReply();
+            
+            const userRecord = await db.getUser(pilotId);
+            if (!userRecord) {
+                return interaction.editReply("❌ Could not find pilot in database.");
+            }
+            
+            // Trigger checkPromotions with isCheckridePass = true
+            let member;
+            try {
+                member = await interaction.guild.members.fetch(pilotId);
+            } catch (err) {
+                return interaction.editReply("❌ Could not find pilot in the server.");
+            }
+            
+            const promo = await checkPromotions(member, userRecord, interaction.guild, 0, true);
+            
+            if (promo.planeOptions.length > 0) {
+                const selectMenu = new StringSelectMenuBuilder()
+                    .setCustomId('select_plane')
+                    .setPlaceholder('Select your aircraft')
+                    .addOptions(
+                        promo.planeOptions.map(plane => 
+                            new StringSelectMenuOptionBuilder()
+                                .setLabel(plane)
+                                .setValue(plane)
+                        )
+                    );
+                const row = new ActionRowBuilder().addComponents(selectMenu);
+                
+                const embedD = new EmbedBuilder()
+                    .setTitle("✅ Checkride Passed!")
+                    .setColor("#00FF00")
+                    .setDescription(`Congratulations! You passed your checkride.\n` +
+                                    (promo.newRankName ? `You have been promoted to **${promo.newRankName}**!\n` : "") +
+                                    `Please select your new aircraft below:`);
+                
+                await sendDM(member, { embeds: [embedD], components: [row] });
+            } else if (promo.newRankName) {
+                const embedD = new EmbedBuilder()
+                    .setTitle("✅ Checkride Passed!")
+                    .setColor("#00FF00")
+                    .setDescription(`Congratulations! You passed your checkride and have been promoted to **${promo.newRankName}**!`);
+                await sendDM(member, { embeds: [embedD] });
+            } else {
+                 const embedD = new EmbedBuilder()
+                    .setTitle("✅ Checkride Passed!")
+                    .setColor("#00FF00")
+                    .setDescription(`Congratulations! You passed your checkride.`);
+                await sendDM(member, { embeds: [embedD] });
+            }
+            
+            await interaction.editReply(`✅ <@${pilotId}> has passed their checkride. This ticket will close in 10 seconds.`);
+            
+            setTimeout(async () => {
+                if (interaction.channel.isThread()) {
+                    await interaction.channel.setArchived(true, "Checkride passed");
+                }
+            }, 10000);
+            
+        } else if (interaction.customId === 'close_checkride') {
+            // Check permissions (must have TRI role or Administrator)
+            if (!interaction.member.permissions.has('Administrator') && !interaction.member.roles.cache.has(config.TRI_ROLE_ID)) {
+                return interaction.reply({ content: "❌ Only Type Rating Instructors can close checkride tickets.", ephemeral: true });
+            }
+            
+            await interaction.reply({ content: "🔒 Closing ticket in 5 seconds..." });
+            
+            setTimeout(async () => {
+                if (interaction.channel.isThread()) {
+                    await interaction.channel.setArchived(true, "Checkride closed manually");
+                }
+            }, 5000);
+        } else if (interaction.customId.startsWith('cancel_flight_self_')) {
             await interaction.deferReply({ ephemeral: true });
             const pilotId = interaction.customId.replace('cancel_flight_self_', '');
             if (interaction.user.id !== pilotId) {
@@ -1741,6 +1937,7 @@ Return a valid JSON object ONLY:
                 
                 await originalMsg.edit({ embeds: [updatedEmbed], components: [] });
                 await db.incrementMetric('manual_denials');
+                await db.clearActiveFlight(pilotId);
                 await interaction.editReply({ content: "Flight log denied successfully." });
                 
                 // Tag thread if applicable

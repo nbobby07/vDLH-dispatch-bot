@@ -6,6 +6,7 @@ module.exports = {
     LOGS_CHANNEL_ID: '1511388191809212478',
     LIVE_FLIGHTS_CHANNEL_ID: '1519081183286132857',
     DISPATCHER_ROLE_ID: '1506356705175404726',
+    TRI_ROLE_ID: '1519081591761145896',
 
     // Define the promotion tiers and the planes unlocked at each step
     PROMOTIONS: [
