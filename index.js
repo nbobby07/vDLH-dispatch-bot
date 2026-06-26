@@ -609,12 +609,13 @@ client.on(Events.InteractionCreate, async (interaction) => {
             
             // Second Officer (0-14): Domestic only
             // First Officer (15-59): Domestic, Short Haul, Medium Haul
-            // Senior First Officer+ (60+): All routes
+            // Senior First Officer (60-149): Domestic, Short Haul, Medium Haul
+            // Captain+ (150+): All routes
             
             const canDomestic = true;
             const canShort = flightCount >= 15;
             const canMedium = flightCount >= 15;
-            const canLong = flightCount >= 60;
+            const canLong = flightCount >= 150;
             const canCargo = planes.includes('B777F');
 
             const options = [];
