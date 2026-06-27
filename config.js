@@ -28,14 +28,14 @@ module.exports = {
             flightsRequired: 60,
             rankName: "Senior First Officer",
             rankRoleId: "1506356832988303460",
-            unlocks: ["A350", "A330", "B777F"],
+            unlocks: ["A350", "A330", "B777F", "B787"],
             canPick: 1
         },
         {
             flightsRequired: 100,
             rankName: "SFO Checkpoint",
             rankRoleId: "NO ROLE FOR THIS RANK",
-            unlocks: ["A350", "A330", "B777F"],
+            unlocks: ["A350", "A330", "B777F", "B787"],
             canPick: 2
         },
         {
@@ -62,6 +62,7 @@ module.exports = {
         "A350": "1507311916144394270",
         "B747-8": "1507312037720752190",
         "A380": "1507312009669120101",
-        "B777F": "1507311947362730085"
+        "B777F": "1507311947362730085",
+        "B787": "1520361475607232583"
     }
 };

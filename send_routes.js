@@ -41,7 +41,7 @@ client.once('ready', async () => {
             .setColor(lufthansaBlue);
 
         const embedMedium = new EmbedBuilder()
-            .setTitle("MEDIUM-HAUL FLEET: [A350 / A330]")
+            .setTitle("MEDIUM-HAUL FLEET: [A350 / A330 / B787]")
             .setDescription(
                 "• Frankfurt [IRFD/EDDF] ➔ Athens [ILAR/LGAV]\n" +
                 "• Munich [IPPH/EDDM] ➔ Athens [ILAR/LGAV]\n" +
