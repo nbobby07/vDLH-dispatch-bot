@@ -1,6 +1,4 @@
 module.exports = {
-    // The ID of the vDLH Assistant bot that posts the flight logs
-    FLIGHT_LOG_BOT_ID: '1506378385021075657',
 
     // Discord Channel/Category configurations
     LOGS_CHANNEL_ID: '1511388191809212478',

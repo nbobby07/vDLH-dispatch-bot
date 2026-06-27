@@ -43,6 +43,28 @@ const usersCache = new Map();
                 ofpText TEXT
             )
         `);
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS flight_log (
+                flightId       BIGSERIAL PRIMARY KEY,
+                userId         TEXT NOT NULL,
+                callsign       TEXT,
+                aircraft       TEXT,
+                departure      TEXT,
+                arrival        TEXT,
+                haulType       TEXT,
+                routeId        TEXT,
+                dispatchedAt   TIMESTAMPTZ NOT NULL DEFAULT now(),
+                resolvedAt     TIMESTAMPTZ,
+                status         TEXT NOT NULL DEFAULT 'DISPATCHED',
+                flightsAwarded INTEGER,
+                proofUrl       TEXT,
+                aiReasoning    TEXT,
+                reviewedBy     TEXT,
+                denialReason   TEXT
+            )
+        `);
+        await pool.query(`CREATE INDEX IF NOT EXISTS idx_flight_log_userId ON flight_log(userId)`);
+        await pool.query(`CREATE INDEX IF NOT EXISTS idx_flight_log_status ON flight_log(status)`);
     } catch (err) {
         console.error("Failed to initialize database:", err);
     }
@@ -178,5 +200,33 @@ module.exports = {
     },
     clearActiveFlight: async (userId) => {
         await pool.query('DELETE FROM active_flights WHERE userId = $1', [userId]);
+    },
+    
+    logFlightDispatch: async (userId, { callsign, aircraft, departure, arrival, haulType, routeId }) => {
+        try {
+            const { rows } = await pool.query(
+                `INSERT INTO flight_log (userId, callsign, aircraft, departure, arrival, haulType, routeId)
+                 VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING flightId`,
+                [userId, callsign, aircraft, departure, arrival, haulType, routeId]
+            );
+            return rows[0].flightid;
+        } catch (e) { console.error("logFlightDispatch failed:", e); }
+    },
+    
+    logFlightResolution: async (userId, { status, flightsAwarded = null, proofUrl = null, aiReasoning = null, reviewedBy = null, denialReason = null }) => {
+        try {
+            await pool.query(
+                `UPDATE flight_log
+                    SET resolvedAt = now(),
+                        status = $2,
+                        flightsAwarded = COALESCE($3, flightsAwarded),
+                        proofUrl = COALESCE($4, proofUrl),
+                        aiReasoning = COALESCE($5, aiReasoning),
+                        reviewedBy = COALESCE($6, reviewedBy),
+                        denialReason = COALESCE($7, denialReason)
+                  WHERE userId = $1 AND status = 'DISPATCHED'`,
+                [userId, status, flightsAwarded, proofUrl, aiReasoning, reviewedBy, denialReason]
+            );
+        } catch (e) { console.error("logFlightResolution failed:", e); }
     }
 };

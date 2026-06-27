@@ -407,67 +407,6 @@ client.once(Events.ClientReady, async (c) => {
     }
 });
 
-client.on(Events.MessageCreate, async (message) => {
-    // Check if the message is from the vBA Assistant bot
-    if (message.author.id === config.FLIGHT_LOG_BOT_ID) {
-        // We only care if it's an interaction response for /flight-log
-        // In Discord.js, message.interaction holds data if it was a slash command response
-        if (message.interaction && message.interaction.commandName === 'flight-log') {
-            const userId = message.interaction.user.id;
-            
-            // Increment flight count
-            const updatedUser = await db.incrementFlightCount(userId);
-            
-            try {
-                // We need to fetch the member to give them roles
-                const member = await message.guild.members.fetch(userId);
-                
-                // Check if they earned a promotion or new plane
-                const promo = await checkPromotions(member, updatedUser, message.guild, 1);
-                
-                // If they have plane options to pick, DM them
-                if (promo.planeOptions.length > 0) {
-                    const selectMenu = new StringSelectMenuBuilder()
-                        .setCustomId('select_plane')
-                        .setPlaceholder('Select your aircraft')
-                        .addOptions(
-                            promo.planeOptions.map(plane => 
-                                new StringSelectMenuOptionBuilder()
-                                    .setLabel(plane)
-                                    .setValue(plane)
-                            )
-                        );
-                        
-                    const row = new ActionRowBuilder().addComponents(selectMenu);
-                    
-                    const embed = new EmbedBuilder()
-                        .setTitle("Promotion & New Plane Unlock")
-                        .setColor("#075AAA")
-                        .setDescription(`Congratulations! You now have **${updatedUser.flightCount}** flights.\n` +
-                                        (promo.newRankName ? `You have been promoted to **${promo.newRankName}**!\n` : "") +
-                                        `Please select your new aircraft below:`);
-                    
-                    await sendDM(member, {
-                        embeds: [embed],
-                        components: [row]
-                    });
-                } else if (promo.newRankName) {
-                    // Just promoted, no options to pick (or already picked)
-                    const embed = new EmbedBuilder()
-                        .setTitle("Promotion")
-                        .setColor("#075AAA")
-                        .setDescription(`Congratulations! You have reached **${updatedUser.flightCount}** flights and have been promoted to **${promo.newRankName}**!`);
-                    await sendDM(member, { embeds: [embed] });
-                }
-                
-                console.log(`Processed flight log for ${userId}. New count: ${updatedUser.flightCount}`);
-                
-            } catch (err) {
-                console.error("Error processing flight log update:", err);
-            }
-        }
-    }
-});
 
 client.on(Events.InteractionCreate, async (interaction) => {
     try {
@@ -533,39 +472,14 @@ client.on(Events.InteractionCreate, async (interaction) => {
             
             const oldPlanes = userRecord.unlockedPlanes || [];
             
-            if (flightCount >= 60) {
-                if (oldPlanes.includes('A350') || oldPlanes.includes('B787')) {
-                    if (!newPlanes.includes('A350')) newPlanes.push('A350');
+            for (const tier of config.PROMOTIONS) {
+                if (flightCount >= tier.flightsRequired) {
+                    for (const plane of tier.unlocks) {
+                        if (oldPlanes.includes(plane)) {
+                            newPlanes.push(plane);
+                        }
+                    }
                 }
-                if (oldPlanes.includes('A330')) {
-                    if (!newPlanes.includes('A330')) newPlanes.push('A330');
-                }
-                if (oldPlanes.includes('B777F')) {
-                    if (!newPlanes.includes('B777F')) newPlanes.push('B777F');
-                }
-                if (!newPlanes.includes('A350') && !newPlanes.includes('A330') && !newPlanes.includes('B777F')) {
-                     newPlanes.push('A350'); 
-                }
-            }
-            
-            if (flightCount >= 100) {
-                if (!newPlanes.includes('A330') && newPlanes.includes('A350')) newPlanes.push('A330');
-                else if (!newPlanes.includes('A350')) newPlanes.push('A350');
-                else if (!newPlanes.includes('B777F')) newPlanes.push('B777F');
-            }
-            
-            if (flightCount >= 150) {
-                if (oldPlanes.includes('B747-8') || oldPlanes.includes('A380')) {
-                    if (oldPlanes.includes('B747-8')) newPlanes.push('B747-8');
-                    if (oldPlanes.includes('A380')) newPlanes.push('A380');
-                } else {
-                    newPlanes.push('B747-8');
-                }
-            }
-            
-            if (flightCount >= 200) {
-                if (!newPlanes.includes('B747-8')) newPlanes.push('B747-8');
-                if (!newPlanes.includes('A380')) newPlanes.push('A380');
             }
             
             if (oldPlanes.includes('ATR72')) {
@@ -681,6 +595,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
                 return interaction.editReply({ content: "❌ This user does not have an active flight." });
             }
             
+            await db.logFlightResolution(targetUser.id, { status: 'CANCELLED' });
             await db.clearActiveFlight(targetUser.id);
             
             let liveChannelId = await db.getSetting('LIVE_FLIGHTS_CHANNEL_ID');
@@ -1242,6 +1157,8 @@ DISPATCHER: AUTO-DISPATCH                   PIC NAME: ${interaction.user.usernam
 
             // Save OFP to database for live viewing
             await db.setActiveFlight(interaction.user.id, callsign, ofpText);
+            const haulType = route.type;
+            await db.logFlightDispatch(interaction.user.id, { callsign, aircraft, departure: route.departure, arrival: route.arrival, haulType, routeId });
 
             // Post to Live Flights channel
             let liveChannelId = await db.getSetting('LIVE_FLIGHTS_CHANNEL_ID');
@@ -1438,6 +1355,7 @@ DISPATCHER: AUTO-DISPATCH                   PIC NAME: ${interaction.user.usernam
                 return interaction.editReply({ content: 'You can only cancel your own flight!' });
             }
             
+            await db.logFlightResolution(pilotId, { status: 'CANCELLED' });
             await db.clearActiveFlight(pilotId);
             try { await interaction.message.delete(); } catch(e) {}
             return interaction.editReply({ content: "Your active flight has been cancelled." });
@@ -1599,6 +1517,7 @@ Return a valid JSON object ONLY:
                     if (autoApproved) {
                         await db.incrementMetric('ai_auto_approved');
                         const flightsToAward = await getFlightsToAward(dep, arr);
+                        await db.logFlightResolution(pilotUser.id, { status: 'LANDED_AI', flightsAwarded: flightsToAward, proofUrl: proofUrl, aiReasoning: aiReasoning });
                         await db.clearActiveFlight(pilotUser.id);
                     const updatedUser = await db.incrementFlightCount(pilotUser.id, flightsToAward);
                         const boostText = flightsToAward > 1 ? ` (+${flightsToAward} Route Boost!)` : ``;
@@ -1829,6 +1748,8 @@ Return a valid JSON object ONLY:
                 await interaction.editReply({ embeds: [updatedEmbed], components: [] });
                 
                 // Process the promotion
+                const proofUrl = embed.image ? embed.image.url : null;
+                await db.logFlightResolution(pilotId, { status: 'LANDED_MANUAL', flightsAwarded: flightsToAward, proofUrl: proofUrl, reviewedBy: interaction.user.id });
                 await db.clearActiveFlight(pilotId);
                 const updatedUser = await db.incrementFlightCount(pilotId, flightsToAward);
                 try {
@@ -1940,6 +1861,7 @@ Return a valid JSON object ONLY:
                 
                 await originalMsg.edit({ embeds: [updatedEmbed], components: [] });
                 await db.incrementMetric('manual_denials');
+                await db.logFlightResolution(pilotId, { status: 'DENIED', denialReason: reason, reviewedBy: interaction.user.id });
                 await db.clearActiveFlight(pilotId);
                 await interaction.editReply({ content: "Flight log denied successfully." });
                 
