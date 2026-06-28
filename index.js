@@ -1055,15 +1055,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
             }
             
             // Filter planes by Haul Type. 
-            const HAUL_PLANES = {
-                'Domestic': ['A320neo', 'ATR72'],
-                'Short Haul': ['A320neo', 'ATR72'],
-                'Medium Haul': ['A350', 'A330', 'B787'],
-                'Long Haul': ['B747-8', 'A380', 'B787'],
-                'Cargo': ['B777F']
-            };
-            
-            const allowedPlanes = HAUL_PLANES[route.type] || [];
+            const allowedPlanes = config.HAUL_PLANES[route.type] || [];
             const validPlanes = userRecord.unlockedPlanes.filter(p => allowedPlanes.includes(p));
             
             if (validPlanes.length === 0) {
