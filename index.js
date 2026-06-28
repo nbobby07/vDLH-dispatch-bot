@@ -1529,8 +1529,8 @@ Return a valid JSON object ONLY:
                         await db.incrementMetric('ai_auto_approved');
                         const flightsToAward = await getFlightsToAward(dep, arr);
                         await db.logFlightResolution(pilotUser.id, { status: 'LANDED_AI', flightsAwarded: flightsToAward, proofUrl: proofUrl, aiReasoning: aiReasoning });
-                        await db.clearActiveFlight(pilotUser.id);
                     const updatedUser = await db.incrementFlightCount(pilotUser.id, flightsToAward);
+                        await db.clearActiveFlight(pilotUser.id);
                         const boostText = flightsToAward > 1 ? ` (+${flightsToAward} Route Boost!)` : ``;
                         try {
                             const member = await guild.members.fetch(pilotUser.id);
@@ -1732,92 +1732,96 @@ Return a valid JSON object ONLY:
                     return interaction.reply({ content: "Someone else is already processing this flight log!", ephemeral: true });
                 }
                 processingFlights.add(interaction.message.id);
-                await interaction.deferUpdate();
-                await db.incrementMetric('manual_approvals');
-                
-                const routeField = embed.fields.find(f => f.name === "Route")?.value || "";
-                let dep = "UNKNOWN";
-                let arr = "UNKNOWN";
-                if (routeField.includes('-')) {
-                    const parts = routeField.split('-');
-                    dep = parts[0].trim();
-                    arr = parts[1].trim();
-                }
-
-                const flightsToAward = await getFlightsToAward(dep, arr);
-                const boostText = flightsToAward > 1 ? ` (+${flightsToAward} Route Boost!)` : ``;
-                
-                updatedEmbed.color = 0x00ff00; // Green
-                updatedEmbed.title = "Flight Log Approved";
-                updatedEmbed.fields.push({ name: "Reviewed By", value: `<@${interaction.user.id}>`, inline: false });
-                
-                const statusIndex = updatedEmbed.fields.findIndex(f => f.name === 'Status');
-                if (statusIndex !== -1) {
-                    updatedEmbed.fields[statusIndex].value = '🛬 Arrived (Verified)';
-                }
-                
-                await interaction.editReply({ embeds: [updatedEmbed], components: [] });
-                
-                // Process the promotion
-                const proofUrl = embed.image ? embed.image.url : null;
-                await db.logFlightResolution(pilotId, { status: 'LANDED_MANUAL', flightsAwarded: flightsToAward, proofUrl: proofUrl, reviewedBy: interaction.user.id });
-                await db.clearActiveFlight(pilotId);
-                const updatedUser = await db.incrementFlightCount(pilotId, flightsToAward);
                 try {
-                    const member = await interaction.guild.members.fetch(pilotId);
-                    const promo = await checkPromotions(member, updatedUser, interaction.guild, flightsToAward);
+                    await interaction.deferUpdate();
+                    await db.incrementMetric('manual_approvals');
                     
-                    if (promo.planeOptions.length > 0) {
-                        const selectMenu = new StringSelectMenuBuilder()
-                            .setCustomId('select_plane')
-                            .setPlaceholder('Select your aircraft')
-                            .addOptions(
-                                promo.planeOptions.map(plane => 
-                                    new StringSelectMenuOptionBuilder()
-                                        .setLabel(plane)
-                                        .setValue(plane)
-                                )
-                            );
-                        const row = new ActionRowBuilder().addComponents(selectMenu);
-                        
-                        const embed = new EmbedBuilder()
-                            .setTitle("Flight Log Approved")
-                            .setColor("#00FF00")
-                            .setDescription(`Congratulations! Your flight log was approved. You now have **${updatedUser.flightCount}** flights.\n` +
-                                            (promo.newRankName ? `You have been promoted to **${promo.newRankName}**!\n` : "") +
-                                            `Please select your new aircraft below:`);
-                        
-                        await sendDM(member, { embeds: [embed], components: [row] });
-                    } else if (promo.newRankName) {
-                        const embed = new EmbedBuilder()
-                            .setTitle("Flight Log Approved")
-                            .setColor("#00FF00")
-                            .setDescription(`Congratulations! Your flight log was approved. You have reached **${updatedUser.flightCount}** flights and have been promoted to **${promo.newRankName}**!`);
-                        await sendDM(member, { embeds: [embed] });
-                    } else {
-                        const embed = new EmbedBuilder()
-                            .setTitle("Flight Log Approved")
-                            .setColor("#00FF00")
-                            .setDescription(`Your flight log was approved! You now have **${updatedUser.flightCount}** flights${boostText}.`);
-                        await sendDM(member, { embeds: [embed] });
+                    const routeField = embed.fields.find(f => f.name === "Route")?.value || "";
+                    let dep = "UNKNOWN";
+                    let arr = "UNKNOWN";
+                    if (routeField.includes('-')) {
+                        const parts = routeField.split('-');
+                        dep = parts[0].trim();
+                        arr = parts[1].trim();
                     }
-                } catch (err) {
-                    console.error("Error updating member on approve:", err);
-                }
-                
-                // Tag thread if applicable
-                if (interaction.channel.isThread()) {
-                    const parentChannel = interaction.channel.parent;
-                    if (parentChannel && parentChannel.availableTags) {
-                        const approvedTag = parentChannel.availableTags.find(t => t.name.toLowerCase() === 'approved');
-                        if (approvedTag) {
-                            const newTags = new Set(interaction.channel.appliedTags);
-                            const pendingTag = parentChannel.availableTags.find(t => t.name.toLowerCase() === 'pending');
-                            if (pendingTag) newTags.delete(pendingTag.id);
-                            newTags.add(approvedTag.id);
-                            await interaction.channel.setAppliedTags(Array.from(newTags));
+
+                    const flightsToAward = await getFlightsToAward(dep, arr);
+                    const boostText = flightsToAward > 1 ? ` (+${flightsToAward} Route Boost!)` : ``;
+                    
+                    updatedEmbed.color = 0x00ff00; // Green
+                    updatedEmbed.title = "Flight Log Approved";
+                    updatedEmbed.fields.push({ name: "Reviewed By", value: `<@${interaction.user.id}>`, inline: false });
+                    
+                    const statusIndex = updatedEmbed.fields.findIndex(f => f.name === 'Status');
+                    if (statusIndex !== -1) {
+                        updatedEmbed.fields[statusIndex].value = '🛬 Arrived (Verified)';
+                    }
+                    
+                    await interaction.editReply({ embeds: [updatedEmbed], components: [] });
+                    
+                    // Process the promotion
+                    const proofUrl = embed.image ? embed.image.url : null;
+                    await db.logFlightResolution(pilotId, { status: 'LANDED_MANUAL', flightsAwarded: flightsToAward, proofUrl: proofUrl, reviewedBy: interaction.user.id });
+                    const updatedUser = await db.incrementFlightCount(pilotId, flightsToAward);
+                    await db.clearActiveFlight(pilotId);
+                    try {
+                        const member = await interaction.guild.members.fetch(pilotId);
+                        const promo = await checkPromotions(member, updatedUser, interaction.guild, flightsToAward);
+                        
+                        if (promo.planeOptions.length > 0) {
+                            const selectMenu = new StringSelectMenuBuilder()
+                                .setCustomId('select_plane')
+                                .setPlaceholder('Select your aircraft')
+                                .addOptions(
+                                    promo.planeOptions.map(plane => 
+                                        new StringSelectMenuOptionBuilder()
+                                            .setLabel(plane)
+                                            .setValue(plane)
+                                    )
+                                );
+                            const row = new ActionRowBuilder().addComponents(selectMenu);
+                            
+                            const embed = new EmbedBuilder()
+                                .setTitle("Flight Log Approved")
+                                .setColor("#00FF00")
+                                .setDescription(`Congratulations! Your flight log was approved. You now have **${updatedUser.flightCount}** flights.\n` +
+                                                (promo.newRankName ? `You have been promoted to **${promo.newRankName}**!\n` : "") +
+                                                `Please select your new aircraft below:`);
+                            
+                            await sendDM(member, { embeds: [embed], components: [row] });
+                        } else if (promo.newRankName) {
+                            const embed = new EmbedBuilder()
+                                .setTitle("Flight Log Approved")
+                                .setColor("#00FF00")
+                                .setDescription(`Congratulations! Your flight log was approved. You have reached **${updatedUser.flightCount}** flights and have been promoted to **${promo.newRankName}**!`);
+                            await sendDM(member, { embeds: [embed] });
+                        } else {
+                            const embed = new EmbedBuilder()
+                                .setTitle("Flight Log Approved")
+                                .setColor("#00FF00")
+                                .setDescription(`Your flight log was approved! You now have **${updatedUser.flightCount}** flights${boostText}.`);
+                            await sendDM(member, { embeds: [embed] });
+                        }
+                    } catch (err) {
+                        console.error("Error updating member on approve:", err);
+                    }
+                    
+                    // Tag thread if applicable
+                    if (interaction.channel.isThread()) {
+                        const parentChannel = interaction.channel.parent;
+                        if (parentChannel && parentChannel.availableTags) {
+                            const approvedTag = parentChannel.availableTags.find(t => t.name.toLowerCase() === 'approved');
+                            if (approvedTag) {
+                                const newTags = new Set(interaction.channel.appliedTags);
+                                const pendingTag = parentChannel.availableTags.find(t => t.name.toLowerCase() === 'pending');
+                                if (pendingTag) newTags.delete(pendingTag.id);
+                                newTags.add(approvedTag.id);
+                                await interaction.channel.setAppliedTags(Array.from(newTags));
+                            }
                         }
                     }
+                } finally {
+                    processingFlights.delete(interaction.message.id);
                 }
             } else {
                 // Deny flight: Launch a modal
@@ -1850,58 +1854,62 @@ Return a valid JSON object ONLY:
                 return interaction.reply({ content: "Someone else is already processing this flight log!", ephemeral: true });
             }
             processingFlights.add(msgId);
-            await interaction.deferReply({ ephemeral: true });
-            const pilotId = parts[3];
-            
-            const reason = interaction.fields.getTextInputValue('deny_reason_input');
-            
             try {
-                const originalMsg = await interaction.channel.messages.fetch(msgId);
-                const embed = originalMsg.embeds[0];
-                const updatedEmbed = { ...embed.data };
+                await interaction.deferReply({ ephemeral: true });
+                const pilotId = parts[3];
                 
-                updatedEmbed.color = 0xff0000; // Red
-                updatedEmbed.title = "Flight Log Denied";
-                updatedEmbed.fields.push({ name: "Reviewed By", value: `<@${interaction.user.id}>`, inline: false });
-                updatedEmbed.fields.push({ name: "Reason", value: reason, inline: false });
+                const reason = interaction.fields.getTextInputValue('deny_reason_input');
                 
-                const statusIndex = updatedEmbed.fields.findIndex(f => f.name === 'Status');
-                if (statusIndex !== -1) {
-                    updatedEmbed.fields[statusIndex].value = '❌ Denied';
-                }
-                
-                await originalMsg.edit({ embeds: [updatedEmbed], components: [] });
-                await db.incrementMetric('manual_denials');
-                await db.logFlightResolution(pilotId, { status: 'DENIED', denialReason: reason, reviewedBy: interaction.user.id });
-                await db.clearActiveFlight(pilotId);
-                await interaction.editReply({ content: "Flight log denied successfully." });
-                
-                // Tag thread if applicable
-                if (interaction.channel.isThread()) {
-                    const parentChannel = interaction.channel.parent;
-                    if (parentChannel && parentChannel.availableTags) {
-                        const deniedTag = parentChannel.availableTags.find(t => t.name.toLowerCase() === 'denied');
-                        if (deniedTag) {
-                            const newTags = new Set(interaction.channel.appliedTags);
-                            const pendingTag = parentChannel.availableTags.find(t => t.name.toLowerCase() === 'pending');
-                            if (pendingTag) newTags.delete(pendingTag.id);
-                            newTags.add(deniedTag.id);
-                            await interaction.channel.setAppliedTags(Array.from(newTags));
+                try {
+                    const originalMsg = await interaction.channel.messages.fetch(msgId);
+                    const embed = originalMsg.embeds[0];
+                    const updatedEmbed = { ...embed.data };
+                    
+                    updatedEmbed.color = 0xff0000; // Red
+                    updatedEmbed.title = "Flight Log Denied";
+                    updatedEmbed.fields.push({ name: "Reviewed By", value: `<@${interaction.user.id}>`, inline: false });
+                    updatedEmbed.fields.push({ name: "Reason", value: reason, inline: false });
+                    
+                    const statusIndex = updatedEmbed.fields.findIndex(f => f.name === 'Status');
+                    if (statusIndex !== -1) {
+                        updatedEmbed.fields[statusIndex].value = '❌ Denied';
+                    }
+                    
+                    await originalMsg.edit({ embeds: [updatedEmbed], components: [] });
+                    await db.incrementMetric('manual_denials');
+                    await db.logFlightResolution(pilotId, { status: 'DENIED', denialReason: reason, reviewedBy: interaction.user.id });
+                    await db.clearActiveFlight(pilotId);
+                    await interaction.editReply({ content: "Flight log denied successfully." });
+                    
+                    // Tag thread if applicable
+                    if (interaction.channel.isThread()) {
+                        const parentChannel = interaction.channel.parent;
+                        if (parentChannel && parentChannel.availableTags) {
+                            const deniedTag = parentChannel.availableTags.find(t => t.name.toLowerCase() === 'denied');
+                            if (deniedTag) {
+                                const newTags = new Set(interaction.channel.appliedTags);
+                                const pendingTag = parentChannel.availableTags.find(t => t.name.toLowerCase() === 'pending');
+                                if (pendingTag) newTags.delete(pendingTag.id);
+                                newTags.add(deniedTag.id);
+                                await interaction.channel.setAppliedTags(Array.from(newTags));
+                            }
                         }
                     }
-                }
 
-                try {
-                    const member = await interaction.guild.members.fetch(pilotId);
-                    const dmEmbed = new EmbedBuilder()
-                        .setTitle("Flight Log Denied")
-                        .setColor("#FF0000")
-                        .setDescription(`Your recent flight log was denied by a Dispatcher.\n\n**Reason:** ${reason}\n\nPlease ensure all your information and proof is correct before submitting again.`);
-                    await sendDM(member, { embeds: [dmEmbed] });
-                } catch (err) {}
-            } catch (err) {
-                console.error("Modal submit error:", err);
-                await interaction.editReply({ content: "An error occurred while denying." });
+                    try {
+                        const member = await interaction.guild.members.fetch(pilotId);
+                        const dmEmbed = new EmbedBuilder()
+                            .setTitle("Flight Log Denied")
+                            .setColor("#FF0000")
+                            .setDescription(`Your recent flight log was denied by a Dispatcher.\n\n**Reason:** ${reason}\n\nPlease ensure all your information and proof is correct before submitting again.`);
+                        await sendDM(member, { embeds: [dmEmbed] });
+                    } catch (err) {}
+                } catch (err) {
+                    console.error("Modal submit error:", err);
+                    await interaction.editReply({ content: "An error occurred while denying." });
+                }
+            } finally {
+                processingFlights.delete(msgId);
             }
         }
     }
