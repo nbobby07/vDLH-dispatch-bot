@@ -595,7 +595,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
                 return interaction.editReply({ content: "❌ This user does not have an active flight." });
             }
             
-            await db.logFlightResolution(targetUser.id, { status: 'CANCELLED' });
+            const flightId = activeFlight.flightid || activeFlight.flightId;
+            await db.logFlightResolution(targetUser.id, flightId, { status: 'CANCELLED' });
             await db.clearActiveFlight(targetUser.id);
             
             let liveChannelId = await db.getSetting('LIVE_FLIGHTS_CHANNEL_ID');
@@ -1167,9 +1168,9 @@ DISPATCHER: AUTO-DISPATCH                   PIC NAME: ${interaction.user.usernam
                 .setDescription(`\`\`\`text\n${ofpText}\n\`\`\``);
 
             // Save OFP to database for live viewing
-            await db.setActiveFlight(interaction.user.id, callsign, ofpText);
             const haulType = route.type;
-            await db.logFlightDispatch(interaction.user.id, { callsign, aircraft, departure: route.departure, arrival: route.arrival, haulType, routeId });
+            const flightId = await db.logFlightDispatch(interaction.user.id, { callsign, aircraft, departure: route.departure, arrival: route.arrival, haulType, routeId });
+            await db.setActiveFlight(interaction.user.id, callsign, ofpText, flightId);
 
             // Post to Live Flights channel
             let liveChannelId = await db.getSetting('LIVE_FLIGHTS_CHANNEL_ID');
@@ -1365,8 +1366,9 @@ DISPATCHER: AUTO-DISPATCH                   PIC NAME: ${interaction.user.usernam
             if (interaction.user.id !== pilotId) {
                 return interaction.editReply({ content: 'You can only cancel your own flight!' });
             }
-            
-            await db.logFlightResolution(pilotId, { status: 'CANCELLED' });
+            const activeFlight = await db.getActiveFlight({ userId: pilotId });
+            const flightId = activeFlight ? (activeFlight.flightid || activeFlight.flightId) : null;
+            await db.logFlightResolution(pilotId, flightId, { status: 'CANCELLED' });
             await db.clearActiveFlight(pilotId);
             try { await interaction.message.delete(); } catch(e) {}
             return interaction.editReply({ content: "Your active flight has been cancelled." });
@@ -1528,7 +1530,8 @@ Return a valid JSON object ONLY:
                     if (autoApproved) {
                         await db.incrementMetric('ai_auto_approved');
                         const flightsToAward = await getFlightsToAward(dep, arr);
-                        await db.logFlightResolution(pilotUser.id, { status: 'LANDED_AI', flightsAwarded: flightsToAward, proofUrl: proofUrl, aiReasoning: aiReasoning });
+                        const flightId = activeFlightCheck ? (activeFlightCheck.flightid || activeFlightCheck.flightId) : null;
+                        await db.logFlightResolution(pilotUser.id, flightId, { status: 'LANDED_AI', flightsAwarded: flightsToAward, proofUrl: proofUrl, aiReasoning: aiReasoning });
                         await db.clearActiveFlight(pilotUser.id);
                     const updatedUser = await db.incrementFlightCount(pilotUser.id, flightsToAward);
                         const boostText = flightsToAward > 1 ? ` (+${flightsToAward} Route Boost!)` : ``;
@@ -1760,7 +1763,9 @@ Return a valid JSON object ONLY:
                 
                 // Process the promotion
                 const proofUrl = embed.image ? embed.image.url : null;
-                await db.logFlightResolution(pilotId, { status: 'LANDED_MANUAL', flightsAwarded: flightsToAward, proofUrl: proofUrl, reviewedBy: interaction.user.id });
+                const activeFlight = await db.getActiveFlight({ userId: pilotId });
+                const flightId = activeFlight ? (activeFlight.flightid || activeFlight.flightId) : null;
+                await db.logFlightResolution(pilotId, flightId, { status: 'LANDED_MANUAL', flightsAwarded: flightsToAward, proofUrl: proofUrl, reviewedBy: interaction.user.id });
                 await db.clearActiveFlight(pilotId);
                 const updatedUser = await db.incrementFlightCount(pilotId, flightsToAward);
                 try {
@@ -1872,7 +1877,9 @@ Return a valid JSON object ONLY:
                 
                 await originalMsg.edit({ embeds: [updatedEmbed], components: [] });
                 await db.incrementMetric('manual_denials');
-                await db.logFlightResolution(pilotId, { status: 'DENIED', denialReason: reason, reviewedBy: interaction.user.id });
+                const activeFlight = await db.getActiveFlight({ userId: pilotId });
+                const flightId = activeFlight ? (activeFlight.flightid || activeFlight.flightId) : null;
+                await db.logFlightResolution(pilotId, flightId, { status: 'DENIED', denialReason: reason, reviewedBy: interaction.user.id });
                 await db.clearActiveFlight(pilotId);
                 await interaction.editReply({ content: "Flight log denied successfully." });
                 
