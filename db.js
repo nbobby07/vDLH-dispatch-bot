@@ -137,9 +137,13 @@ module.exports = {
         const { rows } = await pool.query('SELECT userId, flightCount FROM users ORDER BY flightCount DESC LIMIT $1', [limit]);
         return rows.map(r => ({ userId: r.userid, flightCount: r.flightcount }));
     },
-    getAllPilots: async () => {
-        const { rows } = await pool.query('SELECT userId, flightCount FROM users ORDER BY flightCount DESC');
+    getAllPilots: async (limit = 10, offset = 0) => {
+        const { rows } = await pool.query('SELECT userId, flightCount FROM users ORDER BY flightCount DESC LIMIT $1 OFFSET $2', [limit, offset]);
         return rows.map(r => ({ userId: r.userid, flightCount: r.flightcount }));
+    },
+    getTotalPilotsCount: async () => {
+        const { rows } = await pool.query('SELECT COUNT(*) as count FROM users');
+        return parseInt(rows[0].count, 10);
     },
     setFlightCount: async (userId, count) => {
         await pool.query(
