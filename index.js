@@ -1925,4 +1925,11 @@ Return a valid JSON object ONLY:
     }
 });
 
-client.login(process.env.DISCORD_TOKEN);
+if (require.main === module) {
+    client.login(process.env.DISCORD_TOKEN);
+}
+
+module.exports = {
+    getLogsChannelId,
+    client
+};
