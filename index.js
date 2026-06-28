@@ -1923,3 +1923,10 @@ Return a valid JSON object ONLY:
 });
 
 client.login(process.env.DISCORD_TOKEN);
+
+if (process.env.NODE_ENV === 'test') {
+    module.exports = {
+        sendErrorToOwner,
+        client
+    };
+}
