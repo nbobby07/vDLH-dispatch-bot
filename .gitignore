@@ -1,4 +1,9 @@
+# Dependencies
 node_modules/
+
+# Secrets
 .env
+
+# Database and backups
 vba.sqlite
 backups/
