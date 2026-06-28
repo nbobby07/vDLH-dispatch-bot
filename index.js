@@ -1529,8 +1529,8 @@ Return a valid JSON object ONLY:
                         await db.incrementMetric('ai_auto_approved');
                         const flightsToAward = await getFlightsToAward(dep, arr);
                         await db.logFlightResolution(pilotUser.id, { status: 'LANDED_AI', flightsAwarded: flightsToAward, proofUrl: proofUrl, aiReasoning: aiReasoning });
-                        await db.clearActiveFlight(pilotUser.id);
                     const updatedUser = await db.incrementFlightCount(pilotUser.id, flightsToAward);
+                        await db.clearActiveFlight(pilotUser.id);
                         const boostText = flightsToAward > 1 ? ` (+${flightsToAward} Route Boost!)` : ``;
                         try {
                             const member = await guild.members.fetch(pilotUser.id);
@@ -1761,8 +1761,8 @@ Return a valid JSON object ONLY:
                 // Process the promotion
                 const proofUrl = embed.image ? embed.image.url : null;
                 await db.logFlightResolution(pilotId, { status: 'LANDED_MANUAL', flightsAwarded: flightsToAward, proofUrl: proofUrl, reviewedBy: interaction.user.id });
-                await db.clearActiveFlight(pilotId);
                 const updatedUser = await db.incrementFlightCount(pilotId, flightsToAward);
+                await db.clearActiveFlight(pilotId);
                 try {
                     const member = await interaction.guild.members.fetch(pilotId);
                     const promo = await checkPromotions(member, updatedUser, interaction.guild, flightsToAward);
