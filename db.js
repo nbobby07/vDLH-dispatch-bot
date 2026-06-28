@@ -122,14 +122,30 @@ module.exports = {
     addUnlockedPlane: async (userId, plane) => {
         const targetIds = [userId, ...getLinkedIds(userId)];
         for (const id of targetIds) {
-            let user = await module.exports.getUser(id);
-            if (!user) {
-                user = await module.exports.createUser(id);
-            }
-            if (!user.unlockedPlanes.includes(plane)) {
-                const newPlanes = [...user.unlockedPlanes, plane];
-                await pool.query('UPDATE users SET unlockedPlanes = $1 WHERE userId = $2', [JSON.stringify(newPlanes), id]);
+            const client = await pool.connect();
+            try {
+                await client.query('BEGIN');
+                const { rows } = await client.query('SELECT * FROM users WHERE userId = $1 FOR UPDATE', [id]);
+                if (rows.length === 0) {
+                    await client.query(
+                        'INSERT INTO users (userId, flightCount, unlockedPlanes) VALUES ($1, 0, $2)',
+                        [id, JSON.stringify([plane])]
+                    );
+                } else {
+                    const unlockedPlanes = JSON.parse(rows[0].unlockedplanes || '[]');
+                    if (!unlockedPlanes.includes(plane)) {
+                        unlockedPlanes.push(plane);
+                        await client.query('UPDATE users SET unlockedPlanes = $1 WHERE userId = $2', [JSON.stringify(unlockedPlanes), id]);
+                    }
+                }
+                await client.query('COMMIT');
                 usersCache.delete(id);
+            } catch (err) {
+                await client.query('ROLLBACK');
+                console.error('Error in addUnlockedPlane:', err);
+                throw err;
+            } finally {
+                client.release();
             }
         }
     },
