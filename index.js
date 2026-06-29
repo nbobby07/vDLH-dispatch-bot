@@ -10,6 +10,7 @@ const fs = require('fs');
 
 const flightLogCooldowns = new Map();
 const processingFlights = new Set();
+const landingPilots = new Set();
 const ai = new GoogleGenAI({
     apiKey: process.env.GEMINI_API_KEY
 });
@@ -1378,6 +1379,10 @@ DISPATCHER: AUTO-DISPATCH                   PIC NAME: ${interaction.user.usernam
             if (interaction.user.id !== pilotId) {
                 return interaction.editReply({ content: 'You can only land your own flight!' });
             }
+            if (landingPilots.has(pilotId)) {
+                return interaction.editReply({ content: '⚠️ You are already in the process of landing! Check your DMs or wait for the upload prompt to time out.' });
+            }
+            landingPilots.add(pilotId);
             
             const msgId = interaction.message.id;
             const liveChannelId = interaction.channelId;
@@ -1427,12 +1432,14 @@ DISPATCHER: AUTO-DISPATCH                   PIC NAME: ${interaction.user.usernam
                 const btnCollector = dmMessage.createMessageComponentCollector({ time: 300000 });
                 btnCollector.on('collect', async i => {
                     if (i.customId === 'cancel_landing') {
+                        landingPilots.delete(pilotId);
                         collector.stop('cancelled');
                         await i.update({ content: "Landing process cancelled! Your flight is still active. When you are actually ready to land, just click the **Land Flight** button on your flight card again.", components: [] });
                     }
                 });
                 
                 collector.on('collect', async m => {
+                    try {
                     const activeFlightCheck = await db.getActiveFlight({ userId: pilotUser.id });
                     if (!activeFlightCheck) {
                         return m.reply("❌ Your flight is no longer active. You may have already landed or cancelled it.");
@@ -1685,16 +1692,21 @@ Return a valid JSON object ONLY:
                         
                         await replyMsg.edit({ content: "⚠️ Flight landed, but AI flagged the proof. It has been sent to Dispatch for manual review." });
                     }
+                    } finally {
+                        landingPilots.delete(pilotId);
+                    }
                 });
 
                 collector.on('end', (collected, reason) => {
                     if (reason === 'cancelled') return;
                     if (collected.size === 0) {
+                        landingPilots.delete(pilotId);
                         dmChannel.send("❌ You didn't upload your screenshot within 5 minutes. If you still need to land, use the `/land` command in the bot commands channel, or click the **Land Flight** button on your flight card again.");
                     }
                 });
 
             } catch (error) {
+                landingPilots.delete(pilotId);
                 console.error("Failed to DM user:", error);
                 return interaction.editReply({ content: '🛬 **Time to land!**\nYour DMs are disabled! Please temporarily enable your DMs for this server, and then click the **Land Flight** button again.' });
             }
