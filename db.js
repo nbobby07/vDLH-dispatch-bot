@@ -43,6 +43,7 @@ const usersCache = new Map();
                 ofpText TEXT
             )
         `);
+        await pool.query(`ALTER TABLE active_flights ADD COLUMN IF NOT EXISTS flightId BIGINT;`);
         await pool.query(`
             CREATE TABLE IF NOT EXISTS flight_log (
                 flightId       BIGSERIAL PRIMARY KEY,
@@ -183,10 +184,10 @@ module.exports = {
         }
         return metrics;
     },
-    setActiveFlight: async (userId, callsign, ofpText) => {
+    setActiveFlight: async (userId, callsign, ofpText, flightId) => {
         await pool.query(
-            'INSERT INTO active_flights (userId, callsign, ofpText) VALUES ($1, $2, $3) ON CONFLICT (userId) DO UPDATE SET callsign = $2, ofpText = $3',
-            [userId, callsign, ofpText]
+            'INSERT INTO active_flights (userId, callsign, ofpText, flightId) VALUES ($1, $2, $3, $4) ON CONFLICT (userId) DO UPDATE SET callsign = $2, ofpText = $3, flightId = $4',
+            [userId, callsign, ofpText, flightId]
         );
     },
     getActiveFlight: async (query) => {
@@ -213,7 +214,7 @@ module.exports = {
         } catch (e) { console.error("logFlightDispatch failed:", e); }
     },
     
-    logFlightResolution: async (userId, { status, flightsAwarded = null, proofUrl = null, aiReasoning = null, reviewedBy = null, denialReason = null }) => {
+    logFlightResolution: async (userId, flightId, { status, flightsAwarded = null, proofUrl = null, aiReasoning = null, reviewedBy = null, denialReason = null }) => {
         try {
             await pool.query(
                 `UPDATE flight_log
@@ -224,8 +225,8 @@ module.exports = {
                         aiReasoning = COALESCE($5, aiReasoning),
                         reviewedBy = COALESCE($6, reviewedBy),
                         denialReason = COALESCE($7, denialReason)
-                  WHERE userId = $1 AND status = 'DISPATCHED'`,
-                [userId, status, flightsAwarded, proofUrl, aiReasoning, reviewedBy, denialReason]
+                  WHERE userId = $1 AND flightId = $8 AND status = 'DISPATCHED'`,
+                [userId, status, flightsAwarded, proofUrl, aiReasoning, reviewedBy, denialReason, flightId]
             );
         } catch (e) { console.error("logFlightResolution failed:", e); }
     }
