@@ -1753,6 +1753,7 @@ Return a valid JSON object ONLY:
                     return interaction.reply({ content: "Someone else is already processing this flight log!", ephemeral: true });
                 }
                 processingFlights.add(interaction.message.id);
+                try {
                 await interaction.deferUpdate();
                 await db.incrementMetric('manual_approvals');
                 
@@ -1842,6 +1843,9 @@ Return a valid JSON object ONLY:
                         }
                     }
                 }
+                } finally {
+                    processingFlights.delete(interaction.message.id);
+                }
             } else {
                 // Deny flight: Launch a modal
                 const modal = new ModalBuilder()
@@ -1863,9 +1867,6 @@ Return a valid JSON object ONLY:
         }
     } else if (interaction.isModalSubmit()) {
 
-
-
-
         if (interaction.customId.startsWith('deny_reason_modal_')) {
             const parts = interaction.customId.split('_');
             const msgId = parts[4];
@@ -1873,12 +1874,12 @@ Return a valid JSON object ONLY:
                 return interaction.reply({ content: "Someone else is already processing this flight log!", ephemeral: true });
             }
             processingFlights.add(msgId);
-            await interaction.deferReply({ ephemeral: true });
-            const pilotId = parts[3];
-            
-            const reason = interaction.fields.getTextInputValue('deny_reason_input');
-            
             try {
+                await interaction.deferReply({ ephemeral: true });
+                const pilotId = parts[3];
+                
+                const reason = interaction.fields.getTextInputValue('deny_reason_input');
+                
                 const originalMsg = await interaction.channel.messages.fetch(msgId);
                 const embed = originalMsg.embeds[0];
                 const updatedEmbed = { ...embed.data };
