@@ -1952,9 +1952,9 @@ function setupAutoBoostScheduler(client) {
         // Pick a random day (1 to 7) (1 = Monday, 7 = Sunday)
         const randomDayOffset = Math.floor(Math.random() * 7) + 1;
         
-        // Start time: 15:00 Berlin time of that day
-        let startDt = DateTime.now().setZone('Europe/Berlin').startOf('day').plus({ days: randomDayOffset, hours: 15 });
-        // End time: 14:59 next day
+        // Start time: 00:00 Berlin time of that day
+        let startDt = DateTime.now().setZone('Europe/Berlin').startOf('day').plus({ days: randomDayOffset });
+        // End time: 23:59 of that day
         let endDt = startDt.plus({ days: 1 }).minus({ minutes: 1 });
         
         const nextBoost = {
