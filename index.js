@@ -1,6 +1,8 @@
 require('dotenv').config();
-const { Client, GatewayIntentBits, Partials, Events, StringSelectMenuBuilder, StringSelectMenuOptionBuilder, ActionRowBuilder, REST, Routes, ButtonBuilder, ButtonStyle, EmbedBuilder, AttachmentBuilder, ModalBuilder, TextInputBuilder, TextInputStyle } = require('discord.js');
+const { Client, GatewayIntentBits, Partials, Events, StringSelectMenuBuilder, StringSelectMenuOptionBuilder, ActionRowBuilder, REST, Routes, ButtonBuilder, ButtonStyle, EmbedBuilder, AttachmentBuilder, ModalBuilder, TextInputBuilder, TextInputStyle, InteractionType } = require('discord.js');
 const { createCanvas, loadImage, GlobalFonts } = require('@napi-rs/canvas');
+const cron = require('node-cron');
+const { DateTime } = require('luxon');
 const db = require('./db');
 const config = require('./config');
 const { ROUTES } = require('./routes');
@@ -283,6 +285,7 @@ const AIRPORT_CHOICES = [
 
 client.once(Events.ClientReady, async (c) => {
     console.log(`Ready! Logged in as ${c.user.tag}`);
+    setupAutoBoostScheduler(c);
     // Register slash commands
     const commands = [
         {
@@ -1542,7 +1545,7 @@ Return a valid JSON object ONLY:
                         await db.logFlightResolution(pilotUser.id, flightId, { status: 'LANDED_AI', flightsAwarded: flightsToAward, proofUrl: proofUrl, aiReasoning: aiReasoning });
                         const updatedUser = await db.incrementFlightCount(pilotUser.id, flightsToAward);
                         await db.clearActiveFlight(pilotUser.id);
-                        const boostText = flightsToAward > 1 ? ` (+${flightsToAward} Route Boost!)` : ``;
+                        const boostText = flightsToAward > 1 ? ` (${flightsToAward}x Route Boost Applied!)` : ``;
                         try {
                             const member = await guild.members.fetch(pilotUser.id);
                             const promo = await checkPromotions(member, updatedUser, guild, flightsToAward);
@@ -1761,7 +1764,7 @@ Return a valid JSON object ONLY:
                 }
 
                 const flightsToAward = await getFlightsToAward(dep, arr);
-                const boostText = flightsToAward > 1 ? ` (+${flightsToAward} Route Boost!)` : ``;
+                const boostText = flightsToAward > 1 ? ` (${flightsToAward}x Route Boost Applied!)` : ``;
                 
                 updatedEmbed.color = 0x00ff00; // Green
                 updatedEmbed.title = "Flight Log Approved";
@@ -1942,6 +1945,81 @@ Return a valid JSON object ONLY:
 
 if (require.main === module) {
     client.login(process.env.DISCORD_TOKEN);
+
+function setupAutoBoostScheduler(client) {
+    // 1. Weekly randomizer - runs every Sunday at 00:00 Europe/Berlin
+    cron.schedule('0 0 * * 0', async () => {
+        // Pick a random day (1 to 7) (1 = Monday, 7 = Sunday)
+        const randomDayOffset = Math.floor(Math.random() * 7) + 1;
+        
+        // Start time: 15:00 Berlin time of that day
+        let startDt = DateTime.now().setZone('Europe/Berlin').startOf('day').plus({ days: randomDayOffset, hours: 15 });
+        // End time: 14:59 next day
+        let endDt = startDt.plus({ days: 1 }).minus({ minutes: 1 });
+        
+        const nextBoost = {
+            startTimestamp: startDt.toMillis(),
+            endTimestamp: endDt.toMillis(),
+            announced: false
+        };
+        
+        await db.setSetting('NEXT_AUTO_BOOST', JSON.stringify(nextBoost));
+        console.log(`[AutoBoost] Scheduled next boost: ${startDt.toString()} to ${endDt.toString()}`);
+    }, {
+        timezone: "Europe/Berlin"
+    });
+
+    // 2. Minutely Watchdog
+    cron.schedule('* * * * *', async () => {
+        try {
+            const nextBoostStr = await db.getSetting('NEXT_AUTO_BOOST');
+            if (!nextBoostStr) return;
+            
+            const nextBoost = JSON.parse(nextBoostStr);
+            const now = Date.now();
+            
+            // Check if we need to start
+            if (now >= nextBoost.startTimestamp && now <= nextBoost.endTimestamp && !nextBoost.announced) {
+                // Activate boost
+                await db.setSetting('ACTIVE_BOOST', JSON.stringify({
+                    multiplier: 2,
+                    mode: null,
+                    airport1: null,
+                    airport2: null
+                }));
+                
+                // Announce
+                const eventsChannelId = config.EVENTS_CHANNEL_ID;
+                if (eventsChannelId) {
+                    const eventsChannel = await client.channels.fetch(eventsChannelId).catch(() => null);
+                    if (eventsChannel) {
+                        const embed = new EmbedBuilder()
+                            .setColor("#FFD700")
+                            .setTitle("🚀 24-Hour Global 2x Boost Active!")
+                            .setDescription(`A surprise Global 2x Route Boost has just started!\n\nAll flights will earn double logs.\n\n**Start:** <t:${Math.floor(nextBoost.startTimestamp/1000)}:F>\n**End:** <t:${Math.floor(nextBoost.endTimestamp/1000)}:F>`);
+                            
+                        await eventsChannel.send({ content: "@everyone", embeds: [embed] });
+                    }
+                }
+                
+                // Update state
+                nextBoost.announced = true;
+                await db.setSetting('NEXT_AUTO_BOOST', JSON.stringify(nextBoost));
+                console.log(`[AutoBoost] Activated and announced!`);
+            }
+            
+            // Check if we need to end
+            if (now > nextBoost.endTimestamp && nextBoost.announced) {
+                // Deactivate boost
+                await db.setSetting('ACTIVE_BOOST', '');
+                await db.setSetting('NEXT_AUTO_BOOST', '');
+                console.log(`[AutoBoost] Deactivated and cleared.`);
+            }
+        } catch (e) {
+            console.error("AutoBoost Watchdog Error:", e);
+        }
+    });
+}
 }
 
 module.exports = {
