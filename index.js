@@ -1965,6 +1965,19 @@ function setupAutoBoostScheduler(client) {
         
         await db.setSetting('NEXT_AUTO_BOOST', JSON.stringify(nextBoost));
         console.log(`[AutoBoost] Scheduled next boost: ${startDt.toString()} to ${endDt.toString()}`);
+        
+        try {
+            const staffChannel = await client.channels.fetch('1506358021411045536').catch(() => null);
+            if (staffChannel) {
+                const embed = new EmbedBuilder()
+                    .setColor("#0099FF")
+                    .setTitle("🤫 Auto-Boost Scheduled!")
+                    .setDescription(`The automated system has selected a day for this week's Global 2x Boost.\n\n**Start:** <t:${Math.floor(nextBoost.startTimestamp/1000)}:F>\n**End:** <t:${Math.floor(nextBoost.endTimestamp/1000)}:F>\n\n*Please keep this a secret from the pilots until it automatically activates!*`);
+                await staffChannel.send({ embeds: [embed] });
+            }
+        } catch (e) {
+            console.error("Failed to notify staff channel:", e);
+        }
     }, {
         timezone: "Europe/Berlin"
     });
