@@ -1761,10 +1761,19 @@ Return a valid JSON object ONLY:
                 const routeField = embed.fields.find(f => f.name === "Route")?.value || "";
                 let flightsToAward = 1;
                 
-                // Parse departure and arrival from route string (e.g. EDDF ➔ EDDM)
-                const routeParts = routeField.split('➔').map(s => s.trim());
-                if (routeParts.length === 2) {
-                    flightsToAward = await getFlightsToAward(routeParts[0], routeParts[1]);
+                // Parse departure and arrival from route string (e.g. EDDF - EDDM)
+                let depStr = "UNKNOWN";
+                let arrStr = "UNKNOWN";
+                if (routeField.includes('➔')) {
+                    const routeParts = routeField.split('➔').map(s => s.trim());
+                    if (routeParts.length === 2) { depStr = routeParts[0]; arrStr = routeParts[1]; }
+                } else if (routeField.includes('-')) {
+                    const routeParts = routeField.split('-').map(s => s.trim());
+                    if (routeParts.length === 2) { depStr = routeParts[0]; arrStr = routeParts[1]; }
+                }
+                
+                if (depStr !== "UNKNOWN" && arrStr !== "UNKNOWN") {
+                    flightsToAward = await getFlightsToAward(depStr, arrStr);
                 }
                 
                 updatedEmbed.color = 0x00ff00; // Green
