@@ -597,7 +597,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
             await interaction.deferReply({ ephemeral: true });
             
             const dispatcherRoleId = config.DISPATCHER_ROLE_ID;
-            if (!interaction.member.permissions.has('Administrator') && !interaction.member.roles.cache.has(dispatcherRoleId)) {
+            if (!interaction.memberPermissions?.has('Administrator') && !(Array.isArray(interaction.member.roles) ? interaction.member.roles.includes() : interaction.member.roles.cache.has())) {
                 return interaction.editReply({ content: "❌ You do not have permission to cancel flights." });
             }
 
@@ -657,7 +657,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
             await interaction.editReply({ embeds: [embed] });
         } else if (interaction.commandName === 'metrics') {
             await interaction.deferReply({ ephemeral: true });
-            if (!interaction.member.permissions.has('Administrator')) {
+            if (!interaction.memberPermissions?.has('Administrator')) {
                 return interaction.editReply({ content: "You do not have permission to use this command." });
             }
             
@@ -674,7 +674,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
                 );
             await interaction.editReply({ embeds: [embed] });
         } else if (interaction.commandName === 'roster') {
-            if (!interaction.member.permissions.has('Administrator')) {
+            if (!interaction.memberPermissions?.has('Administrator')) {
                 const embed = new EmbedBuilder().setColor("#FF0000").setDescription("You do not have permission to view the full roster.");
                 return interaction.reply({ embeds: [embed], ephemeral: true });
             }
@@ -814,7 +814,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
             
             await interaction.editReply({ files: [attachment] });
         } else if (interaction.commandName === 'set-flights') {
-            if (!interaction.member.permissions.has('Administrator')) {
+            if (!interaction.memberPermissions?.has('Administrator')) {
                 const embed = new EmbedBuilder().setColor("#FF0000").setDescription("You do not have permission to use this command.");
                 return interaction.reply({ embeds: [embed], ephemeral: true });
             }
@@ -877,7 +877,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
                 console.error("Error processing override promotion:", err);
             }
         } else if (interaction.commandName === 'setup-audit') {
-            if (!interaction.member.permissions.has('Administrator')) {
+            if (!interaction.memberPermissions?.has('Administrator')) {
                 const embed = new EmbedBuilder().setColor("#FF0000").setDescription("You do not have permission to use this command.");
                 return interaction.reply({ embeds: [embed], ephemeral: true });
             }
@@ -913,7 +913,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
                 await interaction.editReply({ embeds: [embed] });
             }
         } else if (interaction.commandName === 'setup-tri') {
-            if (!interaction.member.permissions.has('Administrator')) {
+            if (!interaction.memberPermissions?.has('Administrator')) {
                 const embed = new EmbedBuilder().setColor("#FF0000").setDescription("You do not have permission to use this command.");
                 return interaction.reply({ embeds: [embed], ephemeral: true });
             }
@@ -935,7 +935,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
             await interaction.channel.send({ embeds: [embed], components: [row] });
             await interaction.editReply({ content: "Checkride panel created successfully." });
         } else if (interaction.commandName === 'set-log-channel') {
-            if (!interaction.member.permissions.has('Administrator')) {
+            if (!interaction.memberPermissions?.has('Administrator')) {
                 const embed = new EmbedBuilder().setColor("#FF0000").setDescription("You do not have permission to use this command.");
                 return interaction.reply({ embeds: [embed], ephemeral: true });
             }
@@ -945,7 +945,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
             const embed = new EmbedBuilder().setColor("#00FF00").setDescription(`Flight logs are now restricted to <#${targetChannel.id}>.`);
             await interaction.editReply({ embeds: [embed] });
         } else if (interaction.commandName === 'set-boost') {
-            if (!interaction.member.permissions.has('Administrator')) {
+            if (!interaction.memberPermissions?.has('Administrator')) {
                 const embed = new EmbedBuilder().setColor("#FF0000").setDescription("You do not have permission to use this command.");
                 return interaction.reply({ embeds: [embed], ephemeral: true });
             }
@@ -1239,7 +1239,7 @@ DISPATCHER: AUTO-DISPATCH                   PIC NAME: ${interaction.user.usernam
             }
             
             // Make sure they don't already have the role
-            if (interaction.member.roles.cache.has(rankRole)) {
+            if ((Array.isArray(interaction.member.roles) ? interaction.member.roles.includes() : interaction.member.roles.cache.has())) {
                 return interaction.editReply(`❌ You already have the **${targetRank}** role!`);
             }
             
@@ -1288,7 +1288,7 @@ DISPATCHER: AUTO-DISPATCH                   PIC NAME: ${interaction.user.usernam
             const pilotId = interaction.customId.replace('pass_checkride_', '');
             
             // Check permissions (must have TRI role or Administrator)
-            if (!interaction.member.permissions.has('Administrator') && !interaction.member.roles.cache.has(config.TRI_ROLE_ID)) {
+            if (!interaction.memberPermissions?.has('Administrator') && !(Array.isArray(interaction.member.roles) ? interaction.member.roles.includes() : interaction.member.roles.cache.has())) {
                 return interaction.reply({ content: "❌ Only Type Rating Instructors can pass checkrides.", ephemeral: true });
             }
             
@@ -1354,7 +1354,7 @@ DISPATCHER: AUTO-DISPATCH                   PIC NAME: ${interaction.user.usernam
             
         } else if (interaction.customId === 'close_checkride') {
             // Check permissions (must have TRI role or Administrator)
-            if (!interaction.member.permissions.has('Administrator') && !interaction.member.roles.cache.has(config.TRI_ROLE_ID)) {
+            if (!interaction.memberPermissions?.has('Administrator') && !(Array.isArray(interaction.member.roles) ? interaction.member.roles.includes() : interaction.member.roles.cache.has())) {
                 return interaction.reply({ content: "❌ Only Type Rating Instructors can close checkride tickets.", ephemeral: true });
             }
             
@@ -1736,7 +1736,7 @@ Return a valid JSON object ONLY:
         
         if (interaction.customId.startsWith('approve_flight_') || interaction.customId.startsWith('deny_flight_')) {
             // Check permissions
-            if (!interaction.member.permissions.has('Administrator') && !interaction.member.roles.cache.has(dispatcherRoleId)) {
+            if (!interaction.memberPermissions?.has('Administrator') && !(Array.isArray(interaction.member.roles) ? interaction.member.roles.includes() : interaction.member.roles.cache.has())) {
                 const embed = new EmbedBuilder().setColor("#FF0000").setDescription("You do not have permission to review flight logs.");
                 return interaction.reply({ embeds: [embed], ephemeral: true });
             }
