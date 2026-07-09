@@ -1446,10 +1446,10 @@ DISPATCHER: AUTO-DISPATCH                   PIC NAME: ${interaction.user.usernam
                     try {
                     const activeFlightCheck = await db.getActiveFlight({ userId: pilotUser.id });
                     if (!activeFlightCheck) {
-                        return m.reply("❌ Your flight is no longer active. You may have already landed or cancelled it.");
+                        return m.reply("❌ Your flight is no longer active. You may have already landed or cancelled it.").catch(() => m.channel.send("❌ Your flight is no longer active. You may have already landed or cancelled it."));
                     }
                     
-                    const replyMsg = await m.reply("Processing with AI... ⏳");
+                    const replyMsg = await m.reply("Processing with AI... ⏳").catch(() => m.channel.send("Processing with AI... ⏳"));
                     const proof = m.attachments.first();
                     const proofUrl = proof.url;
                     
