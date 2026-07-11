@@ -425,7 +425,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
     try {
         if (interaction.isChatInputCommand()) {
         if (interaction.commandName === 'register') {
-            await interaction.deferReply({ ephemeral: true });
+            await interaction.deferReply({ ephemeral: true }).catch(() => {});
             // Make sure they are in the database
             let user = await db.getUser(interaction.user.id);
             if (!user) user = await db.createUser(interaction.user.id);
@@ -474,7 +474,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
                 components: [row]
             });
         } else if (interaction.commandName === 'sync') {
-            await interaction.deferReply({ ephemeral: true });
+            await interaction.deferReply({ ephemeral: true }).catch(() => {});
             const userRecord = await db.getUser(interaction.user.id);
             if (!userRecord) {
                 return interaction.editReply({ content: "You haven't registered yet! Please use `/register` to join." });
@@ -519,7 +519,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
             });
             
         } else if (interaction.commandName === 'dispatch') {
-            await interaction.deferReply({ ephemeral: true });
+            await interaction.deferReply({ ephemeral: true }).catch(() => {});
             
             const activeFlight = await db.getActiveFlight({ userId: interaction.user.id });
             if (activeFlight) {
@@ -594,7 +594,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
             await interaction.editReply({ embeds: [ofpEmbed] });
         } else if (interaction.commandName === 'cancelflight') {
-            await interaction.deferReply({ ephemeral: true });
+            await interaction.deferReply({ ephemeral: true }).catch(() => {});
             
             const dispatcherRoleId = config.DISPATCHER_ROLE_ID;
             if (!interaction.memberPermissions?.has('Administrator') && !(Array.isArray(interaction.member.roles) ? interaction.member.roles.includes() : interaction.member.roles.cache.has())) {
@@ -656,7 +656,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
                 .setColor("#075AAA");
             await interaction.editReply({ embeds: [embed] });
         } else if (interaction.commandName === 'metrics') {
-            await interaction.deferReply({ ephemeral: true });
+            await interaction.deferReply({ ephemeral: true }).catch(() => {});
             if (!interaction.memberPermissions?.has('Administrator')) {
                 return interaction.editReply({ content: "You do not have permission to use this command." });
             }
@@ -881,7 +881,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
                 const embed = new EmbedBuilder().setColor("#FF0000").setDescription("You do not have permission to use this command.");
                 return interaction.reply({ embeds: [embed], ephemeral: true });
             }
-            await interaction.deferReply({ ephemeral: true });
+            await interaction.deferReply({ ephemeral: true }).catch(() => {});
             try {
                 const dispatcherRoleId = config.DISPATCHER_ROLE_ID;
                 if (!dispatcherRoleId || dispatcherRoleId.startsWith('REPLACE_')) {
@@ -917,7 +917,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
                 const embed = new EmbedBuilder().setColor("#FF0000").setDescription("You do not have permission to use this command.");
                 return interaction.reply({ embeds: [embed], ephemeral: true });
             }
-            await interaction.deferReply({ ephemeral: true });
+            await interaction.deferReply({ ephemeral: true }).catch(() => {});
             
             const embed = new EmbedBuilder()
                 .setTitle("📝 Request a Checkride")
@@ -939,7 +939,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
                 const embed = new EmbedBuilder().setColor("#FF0000").setDescription("You do not have permission to use this command.");
                 return interaction.reply({ embeds: [embed], ephemeral: true });
             }
-            await interaction.deferReply({ ephemeral: true });
+            await interaction.deferReply({ ephemeral: true }).catch(() => {});
             const targetChannel = interaction.options.getChannel('channel');
             await db.setSetting('LOG_CHANNEL_ID', targetChannel.id);
             const embed = new EmbedBuilder().setColor("#00FF00").setDescription(`Flight logs are now restricted to <#${targetChannel.id}>.`);
@@ -984,7 +984,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
         }
     } else if (interaction.isStringSelectMenu()) {
         if (interaction.customId === 'select_plane') {
-            await interaction.deferUpdate();
+            await interaction.deferUpdate().catch(() => {});
             const selectedPlane = interaction.values[0];
             
             // Make sure it's a valid plane
@@ -1032,7 +1032,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
         }
         
         if (interaction.customId === 'dispatch_haul_type') {
-            await interaction.deferUpdate();
+            await interaction.deferUpdate().catch(() => {});
             const haulType = interaction.values[0];
             const availableRoutes = ROUTES.filter(r => r.type === haulType);
             
@@ -1058,7 +1058,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
         }
         
         if (interaction.customId === 'dispatch_route') {
-            await interaction.deferUpdate();
+            await interaction.deferUpdate().catch(() => {});
             const routeId = interaction.values[0];
             const route = ROUTES.find(r => r.id === routeId);
             
@@ -1093,7 +1093,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
         }
         
         if (interaction.customId.startsWith('dispatch_aircraft:')) {
-            await interaction.deferUpdate();
+            await interaction.deferUpdate().catch(() => {});
             const routeId = interaction.customId.split(':')[1];
             const aircraft = interaction.values[0];
             const route = ROUTES.find(r => r.id === routeId);
@@ -1132,7 +1132,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
         }
         
         if (interaction.customId.startsWith('dispatch_callsign:')) {
-            await interaction.deferUpdate();
+            await interaction.deferUpdate().catch(() => {});
             const parts = interaction.customId.split(':');
             const routeId = parts[1];
             const aircraft = parts[2];
@@ -1217,7 +1217,7 @@ DISPATCHER: AUTO-DISPATCH                   PIC NAME: ${interaction.user.usernam
         }
     } else if (interaction.isButton()) {
         if (interaction.customId === 'create_checkride_ticket') {
-            await interaction.deferReply({ ephemeral: true });
+            await interaction.deferReply({ ephemeral: true }).catch(() => {});
             const userRecord = await db.getUser(interaction.user.id);
             if (!userRecord) {
                 return interaction.editReply("❌ You are not registered.");
@@ -1366,7 +1366,7 @@ DISPATCHER: AUTO-DISPATCH                   PIC NAME: ${interaction.user.usernam
                 }
             }, 5000);
         } else if (interaction.customId.startsWith('cancel_flight_self_')) {
-            await interaction.deferReply({ ephemeral: true });
+            await interaction.deferReply({ ephemeral: true }).catch(() => {});
             const pilotId = interaction.customId.replace('cancel_flight_self_', '');
             if (interaction.user.id !== pilotId) {
                 return interaction.editReply({ content: 'You can only cancel your own flight!' });
@@ -1378,7 +1378,7 @@ DISPATCHER: AUTO-DISPATCH                   PIC NAME: ${interaction.user.usernam
             try { await interaction.message.delete(); } catch(e) {}
             return interaction.editReply({ content: "Your active flight has been cancelled." });
         } else if (interaction.customId.startsWith('land_flight_')) {
-            await interaction.deferReply({ ephemeral: true });
+            await interaction.deferReply({ ephemeral: true }).catch(() => {});
             const pilotId = interaction.customId.replace('land_flight_', '');
             if (interaction.user.id !== pilotId) {
                 return interaction.editReply({ content: 'You can only land your own flight!' });
@@ -1721,13 +1721,13 @@ Return a valid JSON object ONLY:
         const dispatcherRoleId = config.DISPATCHER_ROLE_ID;
         
         if (interaction.customId.startsWith('roster_prev_')) {
-            await interaction.deferUpdate();
+            await interaction.deferUpdate().catch(() => {});
             const currentPage = parseInt(interaction.customId.split('_')[2], 10);
             const pageData = await getRosterPage(currentPage - 1);
             await interaction.editReply(pageData);
             return;
         } else if (interaction.customId.startsWith('roster_next_')) {
-            await interaction.deferUpdate();
+            await interaction.deferUpdate().catch(() => {});
             const currentPage = parseInt(interaction.customId.split('_')[2], 10);
             const pageData = await getRosterPage(currentPage + 1);
             await interaction.editReply(pageData);
@@ -1755,7 +1755,7 @@ Return a valid JSON object ONLY:
                 }
                 processingFlights.add(interaction.message.id);
                 try {
-                await interaction.deferUpdate();
+                await interaction.deferUpdate().catch(() => {});
                 await db.incrementMetric('manual_approvals');
                 
                 const routeField = embed.fields.find(f => f.name === "Route")?.value || "";
@@ -1881,7 +1881,7 @@ Return a valid JSON object ONLY:
             }
             processingFlights.add(msgId);
             try {
-                await interaction.deferReply({ ephemeral: true });
+                await interaction.deferReply({ ephemeral: true }).catch(() => {});
                 const pilotId = parts[3];
                 
                 const reason = interaction.fields.getTextInputValue('deny_reason_input');
