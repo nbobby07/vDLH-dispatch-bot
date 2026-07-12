@@ -1,6 +1,8 @@
 require('dotenv').config();
-const { Client, GatewayIntentBits, Partials, Events, StringSelectMenuBuilder, StringSelectMenuOptionBuilder, ActionRowBuilder, REST, Routes, ButtonBuilder, ButtonStyle, EmbedBuilder, AttachmentBuilder, ModalBuilder, TextInputBuilder, TextInputStyle } = require('discord.js');
+const { Client, GatewayIntentBits, Partials, Events, StringSelectMenuBuilder, StringSelectMenuOptionBuilder, ActionRowBuilder, REST, Routes, ButtonBuilder, ButtonStyle, EmbedBuilder, AttachmentBuilder, ModalBuilder, TextInputBuilder, TextInputStyle, InteractionType } = require('discord.js');
 const { createCanvas, loadImage, GlobalFonts } = require('@napi-rs/canvas');
+const cron = require('node-cron');
+const { DateTime } = require('luxon');
 const db = require('./db');
 const config = require('./config');
 const { ROUTES } = require('./routes');
@@ -28,7 +30,8 @@ const client = new Client({
 // Global Error Telemetry
 async function sendErrorToOwner(err, contextStr) {
     try {
-        const owner = await client.users.fetch('797310456951210034');
+        const ownerId = process.env.BOT_OWNER_ID || '797310456951210034';
+        const owner = await client.users.fetch(ownerId);
         const errStack = err?.stack ? err.stack.substring(0, 1500) : String(err);
         const msg = `🚨 **Bot Crash / Error Detected** 🚨\n**Context:** ${contextStr}\n\`\`\`js\n${errStack}\n\`\`\``;
         await owner.send(msg);
@@ -44,7 +47,8 @@ async function sendDM(member, payload) {
         console.error("Failed to send DM to member:", e);
     }
     try {
-        const owner = await client.users.fetch('797310456951210034');
+        const ownerId = process.env.BOT_OWNER_ID || '797310456951210034';
+        const owner = await client.users.fetch(ownerId);
         const forwardPayload = { ...payload };
         let userStr = member.user ? member.user.username : (member.id || "Unknown");
         forwardPayload.content = `**[FORWARDED DM TO ${userStr}]**\n` + (forwardPayload.content || "");
@@ -66,13 +70,13 @@ process.on('unhandledRejection', (reason, promise) => {
 
 // Helper for roster pagination
 async function getRosterPage(pageIndex) {
-    const allPilots = await db.getAllPilots();
+    const totalCount = await db.getTotalPilotsCount();
     const itemsPerPage = 10;
-    const totalPages = Math.ceil(allPilots.length / itemsPerPage) || 1;
+    const totalPages = Math.ceil(totalCount / itemsPerPage) || 1;
     const page = Math.max(0, Math.min(pageIndex, totalPages - 1));
     
     const startIdx = page * itemsPerPage;
-    const pagePilots = allPilots.slice(startIdx, startIdx + itemsPerPage);
+    const pagePilots = await db.getAllPilots(itemsPerPage, startIdx);
     
     let desc = "";
     if (pagePilots.length === 0) {
@@ -87,7 +91,7 @@ async function getRosterPage(pageIndex) {
         .setTitle(`Airline Pilot Roster`)
         .setDescription(desc)
         .setColor("#075AAA")
-        .setFooter({ text: `Page ${page + 1} of ${totalPages} | Total Pilots: ${allPilots.length}` });
+        .setFooter({ text: `Page ${page + 1} of ${totalPages} | Total Pilots: ${totalCount}` });
         
     const prevBtn = new ButtonBuilder()
         .setCustomId(`roster_prev_${page}`)
@@ -116,6 +120,13 @@ async function sendAuditLog(guild, message) {
     } catch (err) {
         console.error("Failed to send audit log:", err);
     }
+}
+
+// Helper to get logs channel ID
+async function getLogsChannelId() {
+    let logsChannelId = await db.getSetting('LOG_CHANNEL_ID');
+    if (!logsChannelId) logsChannelId = config.LOGS_CHANNEL_ID;
+    return logsChannelId;
 }
 
 // Helper to determine route boost multiplier
@@ -274,6 +285,7 @@ const AIRPORT_CHOICES = [
 
 client.once(Events.ClientReady, async (c) => {
     console.log(`Ready! Logged in as ${c.user.tag}`);
+    setupAutoBoostScheduler(c);
     // Register slash commands
     const commands = [
         {
@@ -413,7 +425,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
     try {
         if (interaction.isChatInputCommand()) {
         if (interaction.commandName === 'register') {
-            await interaction.deferReply({ ephemeral: true });
+            await interaction.deferReply({ ephemeral: true }).catch(() => {});
             // Make sure they are in the database
             let user = await db.getUser(interaction.user.id);
             if (!user) user = await db.createUser(interaction.user.id);
@@ -462,7 +474,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
                 components: [row]
             });
         } else if (interaction.commandName === 'sync') {
-            await interaction.deferReply({ ephemeral: true });
+            await interaction.deferReply({ ephemeral: true }).catch(() => {});
             const userRecord = await db.getUser(interaction.user.id);
             if (!userRecord) {
                 return interaction.editReply({ content: "You haven't registered yet! Please use `/register` to join." });
@@ -507,7 +519,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
             });
             
         } else if (interaction.commandName === 'dispatch') {
-            await interaction.deferReply({ ephemeral: true });
+            await interaction.deferReply({ ephemeral: true }).catch(() => {});
             
             const activeFlight = await db.getActiveFlight({ userId: interaction.user.id });
             if (activeFlight) {
@@ -582,10 +594,10 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
             await interaction.editReply({ embeds: [ofpEmbed] });
         } else if (interaction.commandName === 'cancelflight') {
-            await interaction.deferReply({ ephemeral: true });
+            await interaction.deferReply({ ephemeral: true }).catch(() => {});
             
             const dispatcherRoleId = config.DISPATCHER_ROLE_ID;
-            if (!interaction.member.permissions.has('Administrator') && !interaction.member.roles.cache.has(dispatcherRoleId)) {
+            if (!interaction.memberPermissions?.has('Administrator') && !(Array.isArray(interaction.member.roles) ? interaction.member.roles.includes() : interaction.member.roles.cache.has())) {
                 return interaction.editReply({ content: "❌ You do not have permission to cancel flights." });
             }
 
@@ -644,8 +656,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
                 .setColor("#075AAA");
             await interaction.editReply({ embeds: [embed] });
         } else if (interaction.commandName === 'metrics') {
-            await interaction.deferReply({ ephemeral: true });
-            if (!interaction.member.permissions.has('Administrator')) {
+            await interaction.deferReply({ ephemeral: true }).catch(() => {});
+            if (!interaction.memberPermissions?.has('Administrator')) {
                 return interaction.editReply({ content: "You do not have permission to use this command." });
             }
             
@@ -662,7 +674,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
                 );
             await interaction.editReply({ embeds: [embed] });
         } else if (interaction.commandName === 'roster') {
-            if (!interaction.member.permissions.has('Administrator')) {
+            if (!interaction.memberPermissions?.has('Administrator')) {
                 const embed = new EmbedBuilder().setColor("#FF0000").setDescription("You do not have permission to view the full roster.");
                 return interaction.reply({ embeds: [embed], ephemeral: true });
             }
@@ -802,7 +814,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
             
             await interaction.editReply({ files: [attachment] });
         } else if (interaction.commandName === 'set-flights') {
-            if (!interaction.member.permissions.has('Administrator')) {
+            if (!interaction.memberPermissions?.has('Administrator')) {
                 const embed = new EmbedBuilder().setColor("#FF0000").setDescription("You do not have permission to use this command.");
                 return interaction.reply({ embeds: [embed], ephemeral: true });
             }
@@ -865,11 +877,11 @@ client.on(Events.InteractionCreate, async (interaction) => {
                 console.error("Error processing override promotion:", err);
             }
         } else if (interaction.commandName === 'setup-audit') {
-            if (!interaction.member.permissions.has('Administrator')) {
+            if (!interaction.memberPermissions?.has('Administrator')) {
                 const embed = new EmbedBuilder().setColor("#FF0000").setDescription("You do not have permission to use this command.");
                 return interaction.reply({ embeds: [embed], ephemeral: true });
             }
-            await interaction.deferReply({ ephemeral: true });
+            await interaction.deferReply({ ephemeral: true }).catch(() => {});
             try {
                 const dispatcherRoleId = config.DISPATCHER_ROLE_ID;
                 if (!dispatcherRoleId || dispatcherRoleId.startsWith('REPLACE_')) {
@@ -901,11 +913,11 @@ client.on(Events.InteractionCreate, async (interaction) => {
                 await interaction.editReply({ embeds: [embed] });
             }
         } else if (interaction.commandName === 'setup-tri') {
-            if (!interaction.member.permissions.has('Administrator')) {
+            if (!interaction.memberPermissions?.has('Administrator')) {
                 const embed = new EmbedBuilder().setColor("#FF0000").setDescription("You do not have permission to use this command.");
                 return interaction.reply({ embeds: [embed], ephemeral: true });
             }
-            await interaction.deferReply({ ephemeral: true });
+            await interaction.deferReply({ ephemeral: true }).catch(() => {});
             
             const embed = new EmbedBuilder()
                 .setTitle("📝 Request a Checkride")
@@ -923,17 +935,17 @@ client.on(Events.InteractionCreate, async (interaction) => {
             await interaction.channel.send({ embeds: [embed], components: [row] });
             await interaction.editReply({ content: "Checkride panel created successfully." });
         } else if (interaction.commandName === 'set-log-channel') {
-            if (!interaction.member.permissions.has('Administrator')) {
+            if (!interaction.memberPermissions?.has('Administrator')) {
                 const embed = new EmbedBuilder().setColor("#FF0000").setDescription("You do not have permission to use this command.");
                 return interaction.reply({ embeds: [embed], ephemeral: true });
             }
-            await interaction.deferReply({ ephemeral: true });
+            await interaction.deferReply({ ephemeral: true }).catch(() => {});
             const targetChannel = interaction.options.getChannel('channel');
             await db.setSetting('LOG_CHANNEL_ID', targetChannel.id);
             const embed = new EmbedBuilder().setColor("#00FF00").setDescription(`Flight logs are now restricted to <#${targetChannel.id}>.`);
             await interaction.editReply({ embeds: [embed] });
         } else if (interaction.commandName === 'set-boost') {
-            if (!interaction.member.permissions.has('Administrator')) {
+            if (!interaction.memberPermissions?.has('Administrator')) {
                 const embed = new EmbedBuilder().setColor("#FF0000").setDescription("You do not have permission to use this command.");
                 return interaction.reply({ embeds: [embed], ephemeral: true });
             }
@@ -972,7 +984,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
         }
     } else if (interaction.isStringSelectMenu()) {
         if (interaction.customId === 'select_plane') {
-            await interaction.deferUpdate();
+            await interaction.deferUpdate().catch(() => {});
             const selectedPlane = interaction.values[0];
             
             // Make sure it's a valid plane
@@ -1020,7 +1032,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
         }
         
         if (interaction.customId === 'dispatch_haul_type') {
-            await interaction.deferUpdate();
+            await interaction.deferUpdate().catch(() => {});
             const haulType = interaction.values[0];
             const availableRoutes = ROUTES.filter(r => r.type === haulType);
             
@@ -1046,7 +1058,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
         }
         
         if (interaction.customId === 'dispatch_route') {
-            await interaction.deferUpdate();
+            await interaction.deferUpdate().catch(() => {});
             const routeId = interaction.values[0];
             const route = ROUTES.find(r => r.id === routeId);
             
@@ -1057,15 +1069,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
             }
             
             // Filter planes by Haul Type. 
-            const HAUL_PLANES = {
-                'Domestic': ['A320neo', 'ATR72'],
-                'Short Haul': ['A320neo', 'ATR72'],
-                'Medium Haul': ['A350', 'A330', 'B787'],
-                'Long Haul': ['B747-8', 'A380', 'B787'],
-                'Cargo': ['B777F']
-            };
-            
-            const allowedPlanes = HAUL_PLANES[route.type] || [];
+            const allowedPlanes = config.HAUL_PLANES[route.type] || [];
             const validPlanes = userRecord.unlockedPlanes.filter(p => allowedPlanes.includes(p));
             
             if (validPlanes.length === 0) {
@@ -1089,7 +1093,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
         }
         
         if (interaction.customId.startsWith('dispatch_aircraft:')) {
-            await interaction.deferUpdate();
+            await interaction.deferUpdate().catch(() => {});
             const routeId = interaction.customId.split(':')[1];
             const aircraft = interaction.values[0];
             const route = ROUTES.find(r => r.id === routeId);
@@ -1128,7 +1132,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
         }
         
         if (interaction.customId.startsWith('dispatch_callsign:')) {
-            await interaction.deferUpdate();
+            await interaction.deferUpdate().catch(() => {});
             const parts = interaction.customId.split(':');
             const routeId = parts[1];
             const aircraft = parts[2];
@@ -1213,7 +1217,7 @@ DISPATCHER: AUTO-DISPATCH                   PIC NAME: ${interaction.user.usernam
         }
     } else if (interaction.isButton()) {
         if (interaction.customId === 'create_checkride_ticket') {
-            await interaction.deferReply({ ephemeral: true });
+            await interaction.deferReply({ ephemeral: true }).catch(() => {});
             const userRecord = await db.getUser(interaction.user.id);
             if (!userRecord) {
                 return interaction.editReply("❌ You are not registered.");
@@ -1235,7 +1239,7 @@ DISPATCHER: AUTO-DISPATCH                   PIC NAME: ${interaction.user.usernam
             }
             
             // Make sure they don't already have the role
-            if (interaction.member.roles.cache.has(rankRole)) {
+            if ((Array.isArray(interaction.member.roles) ? interaction.member.roles.includes() : interaction.member.roles.cache.has())) {
                 return interaction.editReply(`❌ You already have the **${targetRank}** role!`);
             }
             
@@ -1284,7 +1288,7 @@ DISPATCHER: AUTO-DISPATCH                   PIC NAME: ${interaction.user.usernam
             const pilotId = interaction.customId.replace('pass_checkride_', '');
             
             // Check permissions (must have TRI role or Administrator)
-            if (!interaction.member.permissions.has('Administrator') && !interaction.member.roles.cache.has(config.TRI_ROLE_ID)) {
+            if (!interaction.memberPermissions?.has('Administrator') && !(Array.isArray(interaction.member.roles) ? interaction.member.roles.includes() : interaction.member.roles.cache.has())) {
                 return interaction.reply({ content: "❌ Only Type Rating Instructors can pass checkrides.", ephemeral: true });
             }
             
@@ -1350,7 +1354,7 @@ DISPATCHER: AUTO-DISPATCH                   PIC NAME: ${interaction.user.usernam
             
         } else if (interaction.customId === 'close_checkride') {
             // Check permissions (must have TRI role or Administrator)
-            if (!interaction.member.permissions.has('Administrator') && !interaction.member.roles.cache.has(config.TRI_ROLE_ID)) {
+            if (!interaction.memberPermissions?.has('Administrator') && !(Array.isArray(interaction.member.roles) ? interaction.member.roles.includes() : interaction.member.roles.cache.has())) {
                 return interaction.reply({ content: "❌ Only Type Rating Instructors can close checkride tickets.", ephemeral: true });
             }
             
@@ -1362,7 +1366,7 @@ DISPATCHER: AUTO-DISPATCH                   PIC NAME: ${interaction.user.usernam
                 }
             }, 5000);
         } else if (interaction.customId.startsWith('cancel_flight_self_')) {
-            await interaction.deferReply({ ephemeral: true });
+            await interaction.deferReply({ ephemeral: true }).catch(() => {});
             const pilotId = interaction.customId.replace('cancel_flight_self_', '');
             if (interaction.user.id !== pilotId) {
                 return interaction.editReply({ content: 'You can only cancel your own flight!' });
@@ -1374,7 +1378,7 @@ DISPATCHER: AUTO-DISPATCH                   PIC NAME: ${interaction.user.usernam
             try { await interaction.message.delete(); } catch(e) {}
             return interaction.editReply({ content: "Your active flight has been cancelled." });
         } else if (interaction.customId.startsWith('land_flight_')) {
-            await interaction.deferReply({ ephemeral: true });
+            await interaction.deferReply({ ephemeral: true }).catch(() => {});
             const pilotId = interaction.customId.replace('land_flight_', '');
             if (interaction.user.id !== pilotId) {
                 return interaction.editReply({ content: 'You can only land your own flight!' });
@@ -1442,10 +1446,10 @@ DISPATCHER: AUTO-DISPATCH                   PIC NAME: ${interaction.user.usernam
                     try {
                     const activeFlightCheck = await db.getActiveFlight({ userId: pilotUser.id });
                     if (!activeFlightCheck) {
-                        return m.reply("❌ Your flight is no longer active. You may have already landed or cancelled it.");
+                        return m.reply("❌ Your flight is no longer active. You may have already landed or cancelled it.").catch(() => m.channel.send("❌ Your flight is no longer active. You may have already landed or cancelled it."));
                     }
                     
-                    const replyMsg = await m.reply("Processing with AI... ⏳");
+                    const replyMsg = await m.reply("Processing with AI... ⏳").catch(() => m.channel.send("Processing with AI... ⏳"));
                     const proof = m.attachments.first();
                     const proofUrl = proof.url;
                     
@@ -1495,7 +1499,7 @@ Rules for Approval:
    - ITKO -> RJTT
    - IPPH -> EDDM
 3. Aircraft: The aircraft name on screen can have slight variations compared to the submission. Allow fuzzy matching.
-4. Callsign: The callsign on screen can have extra characters, dashes, or missing digits. Allow fuzzy matching.
+4. Callsign: If the submitted callsign starts with "DLH" or "LHX", verify ONLY that the screenshot's callsign starts with the exact same prefix. Ignore the numbers. If the submitted callsign starts with a different prefix, allow fuzzy matching.
 
 Return a valid JSON object ONLY:
 {
@@ -1539,9 +1543,9 @@ Return a valid JSON object ONLY:
                         const flightsToAward = await getFlightsToAward(dep, arr);
                         const flightId = activeFlightCheck ? (activeFlightCheck.flightid || activeFlightCheck.flightId) : null;
                         await db.logFlightResolution(pilotUser.id, flightId, { status: 'LANDED_AI', flightsAwarded: flightsToAward, proofUrl: proofUrl, aiReasoning: aiReasoning });
+                        const updatedUser = await db.incrementFlightCount(pilotUser.id, flightsToAward);
                         await db.clearActiveFlight(pilotUser.id);
-                    const updatedUser = await db.incrementFlightCount(pilotUser.id, flightsToAward);
-                        const boostText = flightsToAward > 1 ? ` (+${flightsToAward} Route Boost!)` : ``;
+                        const boostText = flightsToAward > 1 ? ` (${flightsToAward}x Route Boost Applied!)` : ``;
                         try {
                             const member = await guild.members.fetch(pilotUser.id);
                             const promo = await checkPromotions(member, updatedUser, guild, flightsToAward);
@@ -1591,8 +1595,7 @@ Return a valid JSON object ONLY:
                             await msgToDelete.delete(); 
                         } catch(e) { console.error("Failed to delete live flight msg", e); }
                         
-                        let logsChannelId = await db.getSetting('LOG_CHANNEL_ID');
-                        if (!logsChannelId) logsChannelId = config.LOGS_CHANNEL_ID;
+                        const logsChannelId = await getLogsChannelId();
                         if (logsChannelId) {
                             try {
                                 const logsChannel = await guild.channels.fetch(logsChannelId);
@@ -1638,20 +1641,22 @@ Return a valid JSON object ONLY:
                             await msgToDelete.delete(); 
                         } catch(e) { console.error("Failed to delete live flight msg", e); }
                         
+                        const flightId = activeFlightCheck ? (activeFlightCheck.flightid || activeFlightCheck.flightId || "unknown") : "unknown";
+                        await db.clearActiveFlight(pilotUser.id);
+                        
                         const approveBtn = new ButtonBuilder()
-                            .setCustomId(`approve_flight_${pilotUser.id}`)
+                            .setCustomId(`approve_flight_${pilotUser.id}_${flightId}`)
                             .setLabel("Approve")
                             .setStyle(ButtonStyle.Success);
                             
                         const denyBtn = new ButtonBuilder()
-                            .setCustomId(`deny_flight_${pilotUser.id}`)
+                            .setCustomId(`deny_flight_${pilotUser.id}_${flightId}`)
                             .setLabel("Deny")
                             .setStyle(ButtonStyle.Danger);
 
                         const row = new ActionRowBuilder().addComponents(approveBtn, denyBtn);
                         
-                        let logsChannelId = await db.getSetting('LOG_CHANNEL_ID');
-                        if (!logsChannelId) logsChannelId = config.LOGS_CHANNEL_ID;
+                        const logsChannelId = await getLogsChannelId();
                         if (logsChannelId) {
                             try {
                                 const logsChannel = await guild.channels.fetch(logsChannelId);
@@ -1691,6 +1696,7 @@ Return a valid JSON object ONLY:
                         }
                         
                         await replyMsg.edit({ content: "⚠️ Flight landed, but AI flagged the proof. It has been sent to Dispatch for manual review." });
+                        await dmChannel.send("⚠️ **Your flight was flagged by AI.**\nIt is currently pending manual review by Dispatch. You will not be able to dispatch another flight until this is resolved.");
                     }
                     } finally {
                         landingPilots.delete(pilotId);
@@ -1715,13 +1721,13 @@ Return a valid JSON object ONLY:
         const dispatcherRoleId = config.DISPATCHER_ROLE_ID;
         
         if (interaction.customId.startsWith('roster_prev_')) {
-            await interaction.deferUpdate();
+            await interaction.deferUpdate().catch(() => {});
             const currentPage = parseInt(interaction.customId.split('_')[2], 10);
             const pageData = await getRosterPage(currentPage - 1);
             await interaction.editReply(pageData);
             return;
         } else if (interaction.customId.startsWith('roster_next_')) {
-            await interaction.deferUpdate();
+            await interaction.deferUpdate().catch(() => {});
             const currentPage = parseInt(interaction.customId.split('_')[2], 10);
             const pageData = await getRosterPage(currentPage + 1);
             await interaction.editReply(pageData);
@@ -1730,55 +1736,62 @@ Return a valid JSON object ONLY:
         
         if (interaction.customId.startsWith('approve_flight_') || interaction.customId.startsWith('deny_flight_')) {
             // Check permissions
-            if (!interaction.member.permissions.has('Administrator') && !interaction.member.roles.cache.has(dispatcherRoleId)) {
+            if (!interaction.memberPermissions?.has('Administrator') && !(Array.isArray(interaction.member.roles) ? interaction.member.roles.includes() : interaction.member.roles.cache.has())) {
                 const embed = new EmbedBuilder().setColor("#FF0000").setDescription("You do not have permission to review flight logs.");
                 return interaction.reply({ embeds: [embed], ephemeral: true });
             }
 
-            const isApprove = interaction.customId.startsWith('approve_flight_');
-            const pilotId = interaction.customId.split('_')[2];
+            const parts = interaction.customId.split('_');
+            const pilotId = parts[2];
+            const flightIdStr = parts[3] || "unknown";
             
             // Get original embed
             const embed = interaction.message.embeds[0];
             const updatedEmbed = { ...embed.data };
             
-            if (isApprove) {
+            if (interaction.customId.startsWith('approve_flight_')) {
                 if (processingFlights.has(interaction.message.id)) {
                     return interaction.reply({ content: "Someone else is already processing this flight log!", ephemeral: true });
                 }
                 processingFlights.add(interaction.message.id);
-                await interaction.deferUpdate();
+                try {
+                await interaction.deferUpdate().catch(() => {});
                 await db.incrementMetric('manual_approvals');
                 
                 const routeField = embed.fields.find(f => f.name === "Route")?.value || "";
-                let dep = "UNKNOWN";
-                let arr = "UNKNOWN";
-                if (routeField.includes('-')) {
-                    const parts = routeField.split('-');
-                    dep = parts[0].trim();
-                    arr = parts[1].trim();
+                let flightsToAward = 1;
+                
+                // Parse departure and arrival from route string (e.g. EDDF - EDDM)
+                let depStr = "UNKNOWN";
+                let arrStr = "UNKNOWN";
+                if (routeField.includes('➔')) {
+                    const routeParts = routeField.split('➔').map(s => s.trim());
+                    if (routeParts.length === 2) { depStr = routeParts[0]; arrStr = routeParts[1]; }
+                } else if (routeField.includes('-')) {
+                    const routeParts = routeField.split('-').map(s => s.trim());
+                    if (routeParts.length === 2) { depStr = routeParts[0]; arrStr = routeParts[1]; }
                 }
-
-                const flightsToAward = await getFlightsToAward(dep, arr);
-                const boostText = flightsToAward > 1 ? ` (+${flightsToAward} Route Boost!)` : ``;
+                
+                if (depStr !== "UNKNOWN" && arrStr !== "UNKNOWN") {
+                    flightsToAward = await getFlightsToAward(depStr, arrStr);
+                }
                 
                 updatedEmbed.color = 0x00ff00; // Green
-                updatedEmbed.title = "Flight Log Approved";
+                updatedEmbed.title = "Flight Log Verified";
                 updatedEmbed.fields.push({ name: "Reviewed By", value: `<@${interaction.user.id}>`, inline: false });
                 
                 const statusIndex = updatedEmbed.fields.findIndex(f => f.name === 'Status');
                 if (statusIndex !== -1) {
-                    updatedEmbed.fields[statusIndex].value = '🛬 Arrived (Verified)';
+                    updatedEmbed.fields[statusIndex].value = '✅ Verified';
                 }
                 
                 await interaction.editReply({ embeds: [updatedEmbed], components: [] });
                 
                 // Process the promotion
+                const flightId = flightIdStr === "unknown" ? null : flightIdStr;
+                
                 const proofUrl = embed.image ? embed.image.url : null;
-                const activeFlight = await db.getActiveFlight({ userId: pilotId });
-                const flightId = activeFlight ? (activeFlight.flightid || activeFlight.flightId) : null;
                 await db.logFlightResolution(pilotId, flightId, { status: 'LANDED_MANUAL', flightsAwarded: flightsToAward, proofUrl: proofUrl, reviewedBy: interaction.user.id });
-                await db.clearActiveFlight(pilotId);
                 const updatedUser = await db.incrementFlightCount(pilotId, flightsToAward);
                 try {
                     const member = await interaction.guild.members.fetch(pilotId);
@@ -1797,26 +1810,26 @@ Return a valid JSON object ONLY:
                             );
                         const row = new ActionRowBuilder().addComponents(selectMenu);
                         
-                        const embed = new EmbedBuilder()
-                            .setTitle("Flight Log Approved")
+                        const embedD = new EmbedBuilder()
+                            .setTitle("Flight Log Verified")
                             .setColor("#00FF00")
-                            .setDescription(`Congratulations! Your flight log was approved. You now have **${updatedUser.flightCount}** flights.\n` +
+                            .setDescription(`Congratulations! Your flight log was approved by a dispatcher. You now have **${updatedUser.flightCount}** flights.\n` +
                                             (promo.newRankName ? `You have been promoted to **${promo.newRankName}**!\n` : "") +
                                             `Please select your new aircraft below:`);
                         
-                        await sendDM(member, { embeds: [embed], components: [row] });
+                        await sendDM(member, { embeds: [embedD], components: [row] });
                     } else if (promo.newRankName) {
-                        const embed = new EmbedBuilder()
-                            .setTitle("Flight Log Approved")
+                        const embedD = new EmbedBuilder()
+                            .setTitle("Flight Log Verified")
                             .setColor("#00FF00")
-                            .setDescription(`Congratulations! Your flight log was approved. You have reached **${updatedUser.flightCount}** flights and have been promoted to **${promo.newRankName}**!`);
-                        await sendDM(member, { embeds: [embed] });
+                            .setDescription(`Congratulations! Your flight log was approved by a dispatcher. You have reached **${updatedUser.flightCount}** flights and have been promoted to **${promo.newRankName}**!`);
+                        await sendDM(member, { embeds: [embedD] });
                     } else {
-                        const embed = new EmbedBuilder()
-                            .setTitle("Flight Log Approved")
-                            .setColor("#00FF00")
-                            .setDescription(`Your flight log was approved! You now have **${updatedUser.flightCount}** flights${boostText}.`);
-                        await sendDM(member, { embeds: [embed] });
+                        const embedD = new EmbedBuilder()
+                        .setTitle("Flight Log Verified")
+                        .setColor("#00FF00")
+                        .setDescription(`Your flight log for ${routeField} was verified by a dispatcher.\nYou now have **${updatedUser.flightCount}** flights${flightsToAward > 1 ? ` (2x Route Boost Applied!)` : ''}.`);
+                        await sendDM(member, { embeds: [embedD] });
                     }
                 } catch (err) {
                     console.error("Error updating member on approve:", err);
@@ -1836,10 +1849,13 @@ Return a valid JSON object ONLY:
                         }
                     }
                 }
+                } finally {
+                    processingFlights.delete(interaction.message.id);
+                }
             } else {
                 // Deny flight: Launch a modal
                 const modal = new ModalBuilder()
-                    .setCustomId(`deny_reason_modal_${pilotId}_${interaction.message.id}`)
+                    .setCustomId(`deny_reason_modal_${pilotId}_${interaction.message.id}_${flightIdStr}`)
                     .setTitle('Deny Flight Log');
 
                 const reasonInput = new TextInputBuilder()
@@ -1857,9 +1873,6 @@ Return a valid JSON object ONLY:
         }
     } else if (interaction.isModalSubmit()) {
 
-
-
-
         if (interaction.customId.startsWith('deny_reason_modal_')) {
             const parts = interaction.customId.split('_');
             const msgId = parts[4];
@@ -1867,12 +1880,12 @@ Return a valid JSON object ONLY:
                 return interaction.reply({ content: "Someone else is already processing this flight log!", ephemeral: true });
             }
             processingFlights.add(msgId);
-            await interaction.deferReply({ ephemeral: true });
-            const pilotId = parts[3];
-            
-            const reason = interaction.fields.getTextInputValue('deny_reason_input');
-            
             try {
+                await interaction.deferReply({ ephemeral: true }).catch(() => {});
+                const pilotId = parts[3];
+                
+                const reason = interaction.fields.getTextInputValue('deny_reason_input');
+                
                 const originalMsg = await interaction.channel.messages.fetch(msgId);
                 const embed = originalMsg.embeds[0];
                 const updatedEmbed = { ...embed.data };
@@ -1889,10 +1902,9 @@ Return a valid JSON object ONLY:
                 
                 await originalMsg.edit({ embeds: [updatedEmbed], components: [] });
                 await db.incrementMetric('manual_denials');
-                const activeFlight = await db.getActiveFlight({ userId: pilotId });
-                const flightId = activeFlight ? (activeFlight.flightid || activeFlight.flightId) : null;
+                const flightIdStr = parts[5];
+                const flightId = flightIdStr === "unknown" ? null : flightIdStr;
                 await db.logFlightResolution(pilotId, flightId, { status: 'DENIED', denialReason: reason, reviewedBy: interaction.user.id });
-                await db.clearActiveFlight(pilotId);
                 await interaction.editReply({ content: "Flight log denied successfully." });
                 
                 // Tag thread if applicable
@@ -1939,4 +1951,100 @@ Return a valid JSON object ONLY:
     }
 });
 
-client.login(process.env.DISCORD_TOKEN);
+if (require.main === module) {
+    client.login(process.env.DISCORD_TOKEN);
+
+function setupAutoBoostScheduler(client) {
+    // 1. Weekly randomizer - runs every Sunday at 00:00 Europe/Berlin
+    cron.schedule('0 0 * * 0', async () => {
+        // Pick a random day (1 to 7) (1 = Monday, 7 = Sunday)
+        const randomDayOffset = Math.floor(Math.random() * 7) + 1;
+        
+        // Start time: 00:00 Berlin time of that day
+        let startDt = DateTime.now().setZone('Europe/Berlin').startOf('day').plus({ days: randomDayOffset });
+        // End time: 23:59 of that day
+        let endDt = startDt.plus({ days: 1 }).minus({ minutes: 1 });
+        
+        const nextBoost = {
+            startTimestamp: startDt.toMillis(),
+            endTimestamp: endDt.toMillis(),
+            announced: false
+        };
+        
+        await db.setSetting('NEXT_AUTO_BOOST', JSON.stringify(nextBoost));
+        console.log(`[AutoBoost] Scheduled next boost: ${startDt.toString()} to ${endDt.toString()}`);
+        
+        try {
+            const staffChannel = await client.channels.fetch('1506358021411045536').catch(() => null);
+            if (staffChannel) {
+                const embed = new EmbedBuilder()
+                    .setColor("#0099FF")
+                    .setTitle("🤫 Auto-Boost Scheduled!")
+                    .setDescription(`The automated system has selected a day for this week's Global 2x Boost.\n\n**Start:** <t:${Math.floor(nextBoost.startTimestamp/1000)}:F>\n**End:** <t:${Math.floor(nextBoost.endTimestamp/1000)}:F>\n\n*Please keep this a secret from the pilots until it automatically activates!*`);
+                await staffChannel.send({ embeds: [embed] });
+            }
+        } catch (e) {
+            console.error("Failed to notify staff channel:", e);
+        }
+    }, {
+        timezone: "Europe/Berlin"
+    });
+
+    // 2. Minutely Watchdog
+    cron.schedule('* * * * *', async () => {
+        try {
+            const nextBoostStr = await db.getSetting('NEXT_AUTO_BOOST');
+            if (!nextBoostStr) return;
+            
+            const nextBoost = JSON.parse(nextBoostStr);
+            const now = Date.now();
+            
+            // Check if we need to start
+            if (now >= nextBoost.startTimestamp && now <= nextBoost.endTimestamp && !nextBoost.announced) {
+                // Activate boost
+                await db.setSetting('ACTIVE_BOOST', JSON.stringify({
+                    multiplier: 2,
+                    mode: null,
+                    airport1: null,
+                    airport2: null
+                }));
+                
+                // Announce
+                const eventsChannelId = config.EVENTS_CHANNEL_ID;
+                if (eventsChannelId) {
+                    const eventsChannel = await client.channels.fetch(eventsChannelId).catch(() => null);
+                    if (eventsChannel) {
+                        const embed = new EmbedBuilder()
+                            .setColor("#FFD700")
+                            .setTitle("🚀 24-Hour Global 2x Boost Active!")
+                            .setDescription(`A surprise Global 2x Route Boost has just started!\n\nAll flights will earn double logs.\n\n**Start:** <t:${Math.floor(nextBoost.startTimestamp/1000)}:F>\n**End:** <t:${Math.floor(nextBoost.endTimestamp/1000)}:F>`);
+                            
+                        await eventsChannel.send({ content: "@everyone", embeds: [embed] });
+                    }
+                }
+                
+                // Update state
+                nextBoost.announced = true;
+                await db.setSetting('NEXT_AUTO_BOOST', JSON.stringify(nextBoost));
+                console.log(`[AutoBoost] Activated and announced!`);
+            }
+            
+            // Check if we need to end
+            if (now > nextBoost.endTimestamp && nextBoost.announced) {
+                // Deactivate boost
+                await db.setSetting('ACTIVE_BOOST', '');
+                await db.setSetting('NEXT_AUTO_BOOST', '');
+                console.log(`[AutoBoost] Deactivated and cleared.`);
+            }
+        } catch (e) {
+            console.error("AutoBoost Watchdog Error:", e);
+        }
+    });
+}
+}
+
+module.exports = {
+    getLogsChannelId,
+    sendErrorToOwner,
+    client
+};

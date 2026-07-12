@@ -5,6 +5,7 @@ module.exports = {
     LIVE_FLIGHTS_CHANNEL_ID: '1519081183286132857',
     DISPATCHER_ROLE_ID: '1506356705175404726',
     TRI_ROLE_ID: '1519081591761145896',
+    EVENTS_CHANNEL_ID: '1507350297444356208',
 
     // Define the promotion tiers and the planes unlocked at each step
     PROMOTIONS: [
@@ -62,5 +63,14 @@ module.exports = {
         "A380": "1507312009669120101",
         "B777F": "1507311947362730085",
         "B787": "1520361475607232583"
+    },
+
+    // Map each haul type to its allowed aircraft
+    HAUL_PLANES: {
+        'Domestic': ['A320neo', 'ATR72'],
+        'Short Haul': ['A320neo', 'ATR72'],
+        'Medium Haul': ['A350', 'A330', 'B787'],
+        'Long Haul': ['B747-8', 'A380', 'B787'],
+        'Cargo': ['B777F']
     }
 };
