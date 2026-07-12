@@ -1499,7 +1499,7 @@ Rules for Approval:
    - ITKO -> RJTT
    - IPPH -> EDDM
 3. Aircraft: The aircraft name on screen can have slight variations compared to the submission. Allow fuzzy matching.
-4. Callsign: The callsign on screen can have extra characters, dashes, or missing digits. Allow fuzzy matching.
+4. Callsign: If the submitted callsign starts with "DLH" or "LHX", verify ONLY that the screenshot's callsign starts with the exact same prefix. Ignore the numbers. If the submitted callsign starts with a different prefix, allow fuzzy matching.
 
 Return a valid JSON object ONLY:
 {
