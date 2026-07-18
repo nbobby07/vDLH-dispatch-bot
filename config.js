@@ -62,5 +62,14 @@ module.exports = {
         "A380": "1507312009669120101",
         "B777F": "1507311947362730085",
         "B787": "1520361475607232583"
+    },
+
+    // Map each haul type to its allowed aircraft
+    HAUL_PLANES: {
+        'Domestic': ['A320neo', 'ATR72'],
+        'Short Haul': ['A320neo', 'ATR72'],
+        'Medium Haul': ['A350', 'A330', 'B787'],
+        'Long Haul': ['B747-8', 'A380', 'B787'],
+        'Cargo': ['B777F']
     }
 };
