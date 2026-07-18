@@ -118,6 +118,13 @@ async function sendAuditLog(guild, message) {
     }
 }
 
+// Helper to get logs channel ID
+async function getLogsChannelId() {
+    let logsChannelId = await db.getSetting('LOG_CHANNEL_ID');
+    if (!logsChannelId) logsChannelId = config.LOGS_CHANNEL_ID;
+    return logsChannelId;
+}
+
 // Helper to determine route boost multiplier
 async function getFlightsToAward(dep, arr) {
     let flightsToAward = 1;
@@ -1591,8 +1598,7 @@ Return a valid JSON object ONLY:
                             await msgToDelete.delete(); 
                         } catch(e) { console.error("Failed to delete live flight msg", e); }
                         
-                        let logsChannelId = await db.getSetting('LOG_CHANNEL_ID');
-                        if (!logsChannelId) logsChannelId = config.LOGS_CHANNEL_ID;
+                        const logsChannelId = await getLogsChannelId();
                         if (logsChannelId) {
                             try {
                                 const logsChannel = await guild.channels.fetch(logsChannelId);
@@ -1650,8 +1656,7 @@ Return a valid JSON object ONLY:
 
                         const row = new ActionRowBuilder().addComponents(approveBtn, denyBtn);
                         
-                        let logsChannelId = await db.getSetting('LOG_CHANNEL_ID');
-                        if (!logsChannelId) logsChannelId = config.LOGS_CHANNEL_ID;
+                        const logsChannelId = await getLogsChannelId();
                         if (logsChannelId) {
                             try {
                                 const logsChannel = await guild.channels.fetch(logsChannelId);
@@ -1939,4 +1944,11 @@ Return a valid JSON object ONLY:
     }
 });
 
-client.login(process.env.DISCORD_TOKEN);
+if (require.main === module) {
+    client.login(process.env.DISCORD_TOKEN);
+}
+
+module.exports = {
+    getLogsChannelId,
+    client
+};
