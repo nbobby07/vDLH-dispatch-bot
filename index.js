@@ -1178,31 +1178,36 @@ DISPATCHER: AUTO-DISPATCH                   PIC NAME: ${interaction.user.usernam
             if (!liveChannelId) liveChannelId = config.LIVE_FLIGHTS_CHANNEL_ID;
             
             if (liveChannelId && !liveChannelId.startsWith('REPLACE_')) {
-                const liveChannel = await interaction.guild.channels.fetch(liveChannelId);
-                const liveEmbed = new EmbedBuilder()
-                    .setTitle('🛫 Live Flight')
-                    .setColor('#0000FF')
-                    .addFields(
-                        { name: 'Pilot', value: `<@${interaction.user.id}>`, inline: true },
-                        { name: 'Callsign', value: callsign, inline: true },
-                        { name: 'Aircraft', value: aircraft, inline: true },
-                        { name: 'Route', value: `${route.departure} - ${route.arrival}`, inline: true },
-                        { name: 'Status', value: '🟢 En Route', inline: true }
-                    )
-                    .setTimestamp();
-    
-                const landButton = new ButtonBuilder()
-                    .setCustomId(`land_flight_${interaction.user.id}`)
-                    .setLabel('Land Flight')
-                    .setStyle(ButtonStyle.Success);
-                    
-                const cancelButton = new ButtonBuilder()
-                    .setCustomId(`cancel_flight_self_${interaction.user.id}`)
-                    .setLabel('Cancel Flight')
-                    .setStyle(ButtonStyle.Danger);
-    
-                const liveRow = new ActionRowBuilder().addComponents(landButton, cancelButton);
-                await liveChannel.send({ embeds: [liveEmbed], components: [liveRow] });
+                // ponytail: interaction.guild can be null (uncached / user-install); client.channels works either way
+                try {
+                    const liveChannel = await client.channels.fetch(liveChannelId);
+                    const liveEmbed = new EmbedBuilder()
+                        .setTitle('🛫 Live Flight')
+                        .setColor('#0000FF')
+                        .addFields(
+                            { name: 'Pilot', value: `<@${interaction.user.id}>`, inline: true },
+                            { name: 'Callsign', value: callsign, inline: true },
+                            { name: 'Aircraft', value: aircraft, inline: true },
+                            { name: 'Route', value: `${route.departure} - ${route.arrival}`, inline: true },
+                            { name: 'Status', value: '🟢 En Route', inline: true }
+                        )
+                        .setTimestamp();
+        
+                    const landButton = new ButtonBuilder()
+                        .setCustomId(`land_flight_${interaction.user.id}`)
+                        .setLabel('Land Flight')
+                        .setStyle(ButtonStyle.Success);
+                        
+                    const cancelButton = new ButtonBuilder()
+                        .setCustomId(`cancel_flight_self_${interaction.user.id}`)
+                        .setLabel('Cancel Flight')
+                        .setStyle(ButtonStyle.Danger);
+        
+                    const liveRow = new ActionRowBuilder().addComponents(landButton, cancelButton);
+                    await liveChannel.send({ embeds: [liveEmbed], components: [liveRow] });
+                } catch (err) {
+                    console.error("Failed to post live flight message:", err);
+                }
             }
             
             await interaction.editReply({
