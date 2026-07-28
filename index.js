@@ -1859,6 +1859,7 @@ Return a valid JSON object ONLY:
                         }
                         
                         await replyMsg.edit({ content: "⚠️ Flight landed, but AI flagged the proof. It has been sent to Dispatch for manual review." });
+                        await dmChannel.send("⚠️ **Your flight was flagged by AI.**\nIt is currently pending manual review by Dispatch. You will not be able to dispatch another flight until this is resolved.");
                     }
                     } finally {
                         landingPilots.delete(pilotId);
