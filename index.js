@@ -75,13 +75,13 @@ process.on('unhandledRejection', (reason, promise) => {
 
 // Helper for roster pagination
 async function getRosterPage(pageIndex) {
-    const allPilots = await db.getAllPilots();
+    const totalCount = await db.getTotalPilotsCount();
     const itemsPerPage = 10;
-    const totalPages = Math.ceil(allPilots.length / itemsPerPage) || 1;
+    const totalPages = Math.ceil(totalCount / itemsPerPage) || 1;
     const page = Math.max(0, Math.min(pageIndex, totalPages - 1));
     
     const startIdx = page * itemsPerPage;
-    const pagePilots = allPilots.slice(startIdx, startIdx + itemsPerPage);
+    const pagePilots = await db.getAllPilots(itemsPerPage, startIdx);
     
     let desc = "";
     if (pagePilots.length === 0) {
@@ -96,7 +96,7 @@ async function getRosterPage(pageIndex) {
         .setTitle(`Airline Pilot Roster`)
         .setDescription(desc)
         .setColor("#075AAA")
-        .setFooter({ text: `Page ${page + 1} of ${totalPages} | Total Pilots: ${allPilots.length}` });
+        .setFooter({ text: `Page ${page + 1} of ${totalPages} | Total Pilots: ${totalCount}` });
         
     const prevBtn = new ButtonBuilder()
         .setCustomId(`roster_prev_${page}`)
