@@ -11,6 +11,15 @@ const fs = require('fs');
 const flightLogCooldowns = new Map();
 const processingFlights = new Set();
 const landingPilots = new Set();
+const pendingEvents = new Map();
+
+const HAUL_PLANES = {
+    'Domestic': ['A320neo', 'ATR72'],
+    'Short Haul': ['A320neo', 'ATR72'],
+    'Medium Haul': ['A350', 'A330', 'B787'],
+    'Long Haul': ['B747-8', 'A380', 'B787'],
+    'Cargo': ['B777F']
+};
 const ai = new GoogleGenAI({
     apiKey: process.env.GEMINI_API_KEY
 });
@@ -118,18 +127,72 @@ async function sendAuditLog(guild, message) {
     }
 }
 
-// Helper to determine route boost multiplier
-async function getFlightsToAward(dep, arr) {
-    let flightsToAward = 1;
+function normalizeAirport(code) {
     const AIRPORT_MAP = {
         'IRFD': 'EDDF', 'IPPH': 'EDDM', 'IMLR': 'EDDW',
         'ISAU': 'LFPG', 'IZOL': 'LIRF', 'ILAR': 'LGAV',
         'IKFL': 'EGLL', 'IPAP': 'LEPA', 'ITKO': 'RJTT'
     };
-    dep = AIRPORT_MAP[dep] || dep;
-    arr = AIRPORT_MAP[arr] || arr;
+    return AIRPORT_MAP[code] || code;
+}
+
+function getPlanesForRoute(route) {
+    return HAUL_PLANES[route.type] || Object.keys(config.PLANE_ROLES);
+}
+
+function buildEventRouteRows(pendingId) {
+    const rows = [];
+    for (let i = 0; i < ROUTES.length; i += 25) {
+        const chunk = ROUTES.slice(i, i + 25);
+        rows.push(new ActionRowBuilder().addComponents(
+            new StringSelectMenuBuilder()
+                .setCustomId(`event_route:${pendingId}:${i}`)
+                .setPlaceholder(i === 0 ? 'Select event route' : 'More routes...')
+                .addOptions(chunk.map(r => ({
+                    label: `${r.departure} → ${r.arrival}`,
+                    description: `${r.type} · ${r.time}`,
+                    value: r.id
+                })))
+        ));
+    }
+    return rows;
+}
+
+async function activateEvent(guild, eventConfig) {
+    await db.setSetting('ACTIVE_EVENT', JSON.stringify(eventConfig));
+    await db.setSetting('ACTIVE_BOOST', '');
+
+    const route = ROUTES.find(r => r.id === eventConfig.routeId);
+    let desc = `**${eventConfig.name}** — **${eventConfig.multiplier}x** on **${route.departure} → ${route.arrival}**`;
+    if (eventConfig.planes?.length) desc += ` (${eventConfig.planes.join(', ')})`;
+    else desc += ' (all aircraft)';
+    if (eventConfig.expiresAt) desc += ` · ends <t:${Math.floor(new Date(eventConfig.expiresAt).getTime() / 1000)}:R>`;
+    await sendAuditLog(guild, `📅 **Event Started**: ${desc}`);
+}
+
+// Helper to determine route boost multiplier
+async function getFlightsToAward(dep, arr, aircraft = null, routeId = null) {
+    let flightsToAward = 1;
+    dep = normalizeAirport(dep);
+    arr = normalizeAirport(arr);
 
     try {
+        const activeEventStr = await db.getSetting('ACTIVE_EVENT');
+        if (activeEventStr) {
+            const event = JSON.parse(activeEventStr);
+            if (event.expiresAt && new Date(event.expiresAt) < new Date()) {
+                await db.setSetting('ACTIVE_EVENT', '');
+            } else {
+                const route = ROUTES.find(r => r.id === event.routeId);
+                const routeMatch = route && (
+                    (routeId && routeId === event.routeId) ||
+                    (dep === route.departure && arr === route.arrival)
+                );
+                const planeMatch = !event.planes?.length || (aircraft && event.planes.includes(aircraft));
+                if (routeMatch && planeMatch) return event.multiplier;
+            }
+        }
+
         const activeBoostStr = await db.getSetting('ACTIVE_BOOST');
         if (activeBoostStr) {
             const boost = JSON.parse(activeBoostStr);
@@ -138,11 +201,9 @@ async function getFlightsToAward(dep, arr) {
             else if (boost.mode === 'DEP' && dep === boost.airport1) applies = true;
             else if (boost.mode === 'ARR' && arr === boost.airport1) applies = true;
             else if (boost.mode === 'ROUTE' && dep === boost.airport1 && arr === boost.airport2) applies = true;
-            else if (!boost.mode) applies = true; // Global boost
+            else if (!boost.mode) applies = true;
 
-            if (applies) {
-                flightsToAward = boost.multiplier;
-            }
+            if (applies) flightsToAward = boost.multiplier;
         }
     } catch (err) {
         console.error("Error reading active boost:", err);
@@ -385,6 +446,16 @@ client.once(Events.ClientReady, async (c) => {
                 },
                 { name: 'airport1', description: 'Primary airport (or Departure if Specific Route)', type: 3, required: false, choices: AIRPORT_CHOICES },
                 { name: 'airport2', description: 'Arrival airport (Only if Specific Route)', type: 3, required: false, choices: AIRPORT_CHOICES }
+            ]
+        },
+        {
+            name: 'set-event',
+            description: 'Start a flight log event with route, aircraft, and automatic boost',
+            default_member_permissions: '8',
+            options: [
+                { name: 'name', description: 'Event name', type: 3, required: true },
+                { name: 'multiplier', description: 'e.g., 2 for 2x flights (0 or 1 to clear event)', type: 4, required: true },
+                { name: 'duration_hours', description: 'Auto-end after this many hours (omit for no expiry)', type: 4, required: false }
             ]
         },
         {
@@ -969,8 +1040,106 @@ client.on(Events.InteractionCreate, async (interaction) => {
             
             const embed = new EmbedBuilder().setColor("#00FF00").setTitle("🚀 Route Boost Active!").setDescription(desc);
             await interaction.editReply({ embeds: [embed] });
+        } else if (interaction.commandName === 'set-event') {
+            if (!interaction.member.permissions.has('Administrator')) {
+                const embed = new EmbedBuilder().setColor("#FF0000").setDescription("You do not have permission to use this command.");
+                return interaction.reply({ embeds: [embed], ephemeral: true });
+            }
+            await interaction.deferReply({ ephemeral: true });
+
+            const multiplier = interaction.options.getInteger('multiplier');
+            if (multiplier <= 1) {
+                await db.setSetting('ACTIVE_EVENT', '');
+                const embed = new EmbedBuilder().setColor("#00FF00").setDescription("Flight event has been cleared.");
+                return interaction.editReply({ embeds: [embed] });
+            }
+
+            const pendingId = `${interaction.user.id}-${Date.now()}`;
+            pendingEvents.set(pendingId, {
+                adminId: interaction.user.id,
+                name: interaction.options.getString('name'),
+                multiplier,
+                durationHours: interaction.options.getInteger('duration_hours')
+            });
+
+            const embed = new EmbedBuilder()
+                .setColor("#075AAA")
+                .setTitle("Configure Event")
+                .setDescription(`**${interaction.options.getString('name')}** · **${multiplier}x** boost\n\nSelect the route for this event:`);
+            await interaction.editReply({ embeds: [embed], components: buildEventRouteRows(pendingId) });
         }
     } else if (interaction.isStringSelectMenu()) {
+        if (interaction.customId.startsWith('event_route:')) {
+            await interaction.deferUpdate();
+            const [, pendingId] = interaction.customId.split(':');
+            const pending = pendingEvents.get(pendingId);
+            if (!pending || pending.adminId !== interaction.user.id) {
+                return interaction.editReply({ content: 'This event setup expired. Run `/set-event` again.', components: [] });
+            }
+
+            const routeId = interaction.values[0];
+            const route = ROUTES.find(r => r.id === routeId);
+            pending.routeId = routeId;
+
+            const planes = getPlanesForRoute(route);
+            const planeMenu = new StringSelectMenuBuilder()
+                .setCustomId(`event_planes:${pendingId}`)
+                .setPlaceholder('Select aircraft (multi-select)')
+                .setMinValues(1)
+                .setMaxValues(planes.length + 1)
+                .addOptions(
+                    new StringSelectMenuOptionBuilder()
+                        .setLabel('All Aircraft')
+                        .setValue('__ALL__')
+                        .setDescription('Any aircraft on this route'),
+                    ...planes.map(p => new StringSelectMenuOptionBuilder().setLabel(p).setValue(p))
+                );
+            const row = new ActionRowBuilder().addComponents(planeMenu);
+
+            const embed = new EmbedBuilder()
+                .setColor("#075AAA")
+                .setTitle("Configure Event")
+                .setDescription(`**${pending.name}** · **${pending.multiplier}x** · **${route.departure} → ${route.arrival}**\n\nSelect which aircraft receive the boost:`);
+            await interaction.editReply({ embeds: [embed], components: [row] });
+            return;
+        }
+
+        if (interaction.customId.startsWith('event_planes:')) {
+            await interaction.deferUpdate();
+            const pendingId = interaction.customId.split(':')[1];
+            const pending = pendingEvents.get(pendingId);
+            if (!pending || pending.adminId !== interaction.user.id || !pending.routeId) {
+                return interaction.editReply({ content: 'This event setup expired. Run `/set-event` again.', components: [] });
+            }
+
+            const route = ROUTES.find(r => r.id === pending.routeId);
+            const planes = interaction.values.includes('__ALL__') ? [] : interaction.values;
+            const expiresAt = pending.durationHours
+                ? new Date(Date.now() + pending.durationHours * 3600000).toISOString()
+                : null;
+
+            const eventConfig = {
+                name: pending.name,
+                routeId: pending.routeId,
+                planes,
+                multiplier: pending.multiplier,
+                expiresAt,
+                createdAt: new Date().toISOString()
+            };
+
+            await activateEvent(interaction.guild, eventConfig);
+            pendingEvents.delete(pendingId);
+
+            let desc = `**${eventConfig.name}** is live with a **${eventConfig.multiplier}x** multiplier!\n\n`;
+            desc += `Route: **${route.departure} → ${route.arrival}** (${route.type})\n`;
+            desc += planes.length ? `Aircraft: **${planes.join(', ')}**\n` : `Aircraft: **All eligible**\n`;
+            if (expiresAt) desc += `Ends: <t:${Math.floor(new Date(expiresAt).getTime() / 1000)}:R>`;
+
+            const embed = new EmbedBuilder().setColor("#00FF00").setTitle("📅 Event Active!").setDescription(desc);
+            await interaction.editReply({ embeds: [embed], components: [] });
+            return;
+        }
+
         if (interaction.customId === 'select_plane') {
             await interaction.deferUpdate();
             const selectedPlane = interaction.values[0];
@@ -1057,14 +1226,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
             }
             
             // Filter planes by Haul Type. 
-            const HAUL_PLANES = {
-                'Domestic': ['A320neo', 'ATR72'],
-                'Short Haul': ['A320neo', 'ATR72'],
-                'Medium Haul': ['A350', 'A330', 'B787'],
-                'Long Haul': ['B747-8', 'A380', 'B787'],
-                'Cargo': ['B777F']
-            };
-            
             const allowedPlanes = HAUL_PLANES[route.type] || [];
             const validPlanes = userRecord.unlockedPlanes.filter(p => allowedPlanes.includes(p));
             
@@ -1541,7 +1702,9 @@ Return a valid JSON object ONLY:
                     
                     if (autoApproved) {
                         await db.incrementMetric('ai_auto_approved');
-                        const flightsToAward = await getFlightsToAward(dep, arr);
+                        const activeFlightCheck = await db.getActiveFlight({ userId: pilotUser.id });
+                        const routeId = activeFlightCheck?.routeid || activeFlightCheck?.routeId || null;
+                        const flightsToAward = await getFlightsToAward(dep, arr, aircraft, routeId);
                         const flightId = activeFlightCheck ? (activeFlightCheck.flightid || activeFlightCheck.flightId) : null;
                         await db.logFlightResolution(pilotUser.id, flightId, { status: 'LANDED_AI', flightsAwarded: flightsToAward, proofUrl: proofUrl, aiReasoning: aiReasoning });
                         await db.clearActiveFlight(pilotUser.id);
@@ -1764,7 +1927,10 @@ Return a valid JSON object ONLY:
                     arr = parts[1].trim();
                 }
 
-                const flightsToAward = await getFlightsToAward(dep, arr);
+                const aircraft = embed.fields.find(f => f.name === "Aircraft")?.value || null;
+                const activeFlight = await db.getActiveFlight({ userId: pilotId });
+                const routeId = activeFlight?.routeid || activeFlight?.routeId || null;
+                const flightsToAward = await getFlightsToAward(dep, arr, aircraft, routeId);
                 const boostText = flightsToAward > 1 ? ` (+${flightsToAward} Route Boost!)` : ``;
                 
                 updatedEmbed.color = 0x00ff00; // Green
@@ -1780,7 +1946,6 @@ Return a valid JSON object ONLY:
                 
                 // Process the promotion
                 const proofUrl = embed.image ? embed.image.url : null;
-                const activeFlight = await db.getActiveFlight({ userId: pilotId });
                 const flightId = activeFlight ? (activeFlight.flightid || activeFlight.flightId) : null;
                 await db.logFlightResolution(pilotId, flightId, { status: 'LANDED_MANUAL', flightsAwarded: flightsToAward, proofUrl: proofUrl, reviewedBy: interaction.user.id });
                 await db.clearActiveFlight(pilotId);
