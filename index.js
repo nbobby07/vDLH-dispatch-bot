@@ -37,7 +37,8 @@ const client = new Client({
 // Global Error Telemetry
 async function sendErrorToOwner(err, contextStr) {
     try {
-        const owner = await client.users.fetch('797310456951210034');
+        const ownerId = process.env.BOT_OWNER_ID || '797310456951210034';
+        const owner = await client.users.fetch(ownerId);
         const errStack = err?.stack ? err.stack.substring(0, 1500) : String(err);
         const msg = `🚨 **Bot Crash / Error Detected** 🚨\n**Context:** ${contextStr}\n\`\`\`js\n${errStack}\n\`\`\``;
         await owner.send(msg);
@@ -53,7 +54,8 @@ async function sendDM(member, payload) {
         console.error("Failed to send DM to member:", e);
     }
     try {
-        const owner = await client.users.fetch('797310456951210034');
+        const ownerId = process.env.BOT_OWNER_ID || '797310456951210034';
+        const owner = await client.users.fetch(ownerId);
         const forwardPayload = { ...payload };
         let userStr = member.user ? member.user.username : (member.id || "Unknown");
         forwardPayload.content = `**[FORWARDED DM TO ${userStr}]**\n` + (forwardPayload.content || "");
@@ -2110,3 +2112,10 @@ Return a valid JSON object ONLY:
 });
 
 client.login(process.env.DISCORD_TOKEN);
+
+if (process.env.NODE_ENV === 'test') {
+    module.exports = {
+        sendErrorToOwner,
+        client
+    };
+}
